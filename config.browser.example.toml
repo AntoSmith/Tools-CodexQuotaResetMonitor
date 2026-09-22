@@ -1,0 +1,56 @@
+# 复制为 config.browser.local.toml 后编辑。不要把填写后的文件提交到 Git。
+# 浏览器模式不需要 X_BEARER_TOKEN 或付费 API 预算。
+
+[monitor]
+database = "data/browser/state.db"
+max_age_hours = 24
+backfill_hours = 24
+reminder_minutes = 0
+
+[browser]
+background = true           # Windows 后台采集，不显示浏览器窗口
+headless = false            # 使用完整浏览器；无头模式可能被网站限制
+interval_minutes = 30
+channel = "chrome"         # chrome 或 msedge，需本机已安装
+profile = "data/browser/profile"  # 独立浏览器配置，可能含登录数据，不上传
+max_posts = 5               # 每账号最多检查 5 条最新发现帖子的详情
+max_scrolls = 1             # 只看头部，最多向下滚动一次；0 为完全不滚动
+context_enabled = true      # 读取回复详情的上文候选，含糊回应只标为待核实
+reset_feed_enabled = true   # 从 codex-reset.com 公开接口发现 Tibo 回复，失败回退公开主页
+# 公开部署请改为带项目联系网址的 User-Agent；无需 X API Key。
+reset_feed_user_agent = "CodexQuotaResetMonitor/0.1 (personal local monitor)"
+conversation_urls = []      # 可选：最多 5 个 https://x.com/用户名/status/数字ID 对话链接
+timeout_seconds = 300
+# node_modules = "node_modules"  # 可选：自定义 Playwright 依赖目录
+
+[notifications]
+channel = "console"        # 默认仅输出日志；发送邮件改为 smtp
+host = "smtp.qq.com"
+port = 465
+username = "sender@example.com"  # 发件邮箱；示例地址必须替换
+to = "recipient@example.com"     # 收件邮箱；示例地址必须替换
+# 也可在桌面“设置 → 收件人”填写备注和邮箱；保存后自动同步，界面名单优先。
+# 多收件人用分号分隔，不限两个：to = "first@example.com;second@example.com;third@example.com"
+# 支持中文分号，兼容中英文冒号和逗号；地址自动去重，不支持空项或换行。
+QQ_SMTP_AUTH_CODE = ""      # QQ SMTP 授权码，不是登录密码；也可通过同名环境变量提供
+# 增删收件人或切换通道后重启监控即可，无需更换 database；新增邮箱不补发历史消息。
+
+# 以下是公开监控账号示例，不是使用者自己的登录账号。
+# 使用前核对账号与数字 ID，确认后把对应 verified 改为 true。
+[[accounts]]
+username = "thsottiaux"
+id = "1953337039510003712"
+kind = "personal"
+verified = false
+
+[[accounts]]
+username = "OpenAIDevs"
+id = "1633874951508721686"
+kind = "organization"
+verified = false
+
+[[accounts]]
+username = "OpenAI"
+id = "4398626122"
+kind = "organization"
+verified = false

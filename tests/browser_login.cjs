@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict');
+const {EventEmitter} = require('node:events');
+const {login} = require('../quota_monitor/browser_login.cjs');
+(async () => {
+  const context = new EventEmitter(); let launched, url, finished=false;
+  context.pages=()=>[{async goto(value){url=value;}}];
+  context.close=async()=>context.emit('close');
+  const browser={async launchPersistentContext(profile,options){launched={profile,...options};return context;}};
+  const job=login({profile:'local-profile',channel:'chrome',username:'demo'},browser).then(()=>{finished=true;});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(launched.headless,false);
+  assert.equal(launched.profile,'local-profile');
+  assert.equal(url,'https://x.com/demo/with_replies');
+  assert.equal(finished,false,'must wait for the user, not finish after navigation');
+  context.emit('close'); await job;
+  assert.equal(finished,true);
+  context.pages=()=>[{async goto(){const e=new Error();e.name='TimeoutError';throw e;}}];
+  const timed=login({profile:'local-profile',channel:'chrome',username:'demo'},browser);
+  await new Promise(resolve=>setImmediate(resolve));context.emit('close');await timed;
+  console.log('Browser login tests passed (visible persistent profile, manual close, navigation timeout)');
+})().catch(e=>{console.error(e);process.exitCode=1;});

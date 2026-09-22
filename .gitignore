@@ -1,0 +1,45 @@
+__pycache__/
+*.py[cod]
+.venv/
+config.local.toml
+*.local.toml
+.env
+.env.*
+!.env.example
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.lock
+
+# Local configuration: only explicitly named templates belong in Git.
+config*.toml
+!config*.example.toml
+*.bak
+*.backup
+*.log
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.exe
+*.pdb
+*.lnk
+node_modules/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.vscode/
+.idea/
+.codex/
+.agents/
+.DS_Store
+Thumbs.db
+
+# Internal investigation notes contain local paths and runtime history.
+docs/*
+!docs/PUBLISH.md
+
+# A separate, reproducible source-only publishing directory.
+github-export/

@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const {failure} = require('../quota_monitor/browser_errors.cjs');
+const denied = failure(new Error('page.goto: net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://x.com/example?secret=hidden'), 'navigate', 403);
+assert.equal(denied.http_status, 403);
+assert.equal(denied.code, 'net::ERR_HTTP_RESPONSE_CODE_FAILURE');
+assert.equal(denied.stage, 'navigate');
+assert.ok(!JSON.stringify(denied).includes('hidden'));
+assert.equal(failure(new Error('Target page, context or browser has been closed'), 'extract').code, 'browser_or_page_closed');
+assert.equal(failure(new Error('Execution context was destroyed, most likely because of a navigation'), 'scroll').code, 'navigation_interrupted');
+assert.equal(failure(new Error('Unknown exception private text'), 'extract').code, 'Error');
+console.log('Browser error tests passed (4 scenarios)');
