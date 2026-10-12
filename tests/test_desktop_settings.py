@@ -7,6 +7,13 @@ from unittest.mock import patch
 from quota_monitor.config import Config, ConfigError
 
 
+DEFAULT_POLICY = dict(enabled=True, accept_uncertain=True, start_at='', end_at='', delivery_mode='immediate')
+
+
+def contacts_with_defaults(rows):
+    return [{**DEFAULT_POLICY, **row} for row in rows]
+
+
 class DesktopSettingsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -33,7 +40,7 @@ class DesktopSettingsTests(unittest.TestCase):
         save_settings(self.path, [{'name': '主邮箱', 'email': 'a@example.com'}])
         save_settings(self.path, 'a@example.com;b@example.com')
         self.assertEqual(read_settings(self.path)['contacts'],
-                         [{'name': '主邮箱', 'email': 'a@example.com'}, {'name': '', 'email': 'b@example.com'}])
+                         contacts_with_defaults([{'name': '主邮箱', 'email': 'a@example.com'}, {'name': '', 'email': 'b@example.com'}]))
 
     def test_invalid_input_and_failed_write_preserve_current_settings(self):
         from quota_monitor.desktop_settings import save_settings
@@ -67,6 +74,7 @@ class DesktopSettingsTests(unittest.TestCase):
         result = save_settings(self.path, contacts)
         expected = [{'name': '我的主邮箱', 'email': 'A@example.com'},
                     {'name': '小王', 'email': 'b@example.com'}, {'name': '', 'email': 'c@example.com'}]
+        expected = contacts_with_defaults(expected)
         self.assertEqual(result['contacts'], expected)
         self.assertEqual(read_settings(self.path)['contacts'], expected)
         config = Config.load(self.path)
@@ -81,14 +89,14 @@ class DesktopSettingsTests(unittest.TestCase):
 
     def test_legacy_settings_get_unnamed_contacts_without_changing_addresses(self):
         from quota_monitor.desktop_settings import read_settings, settings_path, save_settings
-        self.assertEqual(read_settings(self.path)['contacts'], [{'name': '', 'email': 'old@example.com'}])
+        self.assertEqual(read_settings(self.path)['contacts'], contacts_with_defaults([{'name': '', 'email': 'old@example.com'}]))
         p = settings_path(self.path)
         p.parent.mkdir(parents=True)
         p.write_text(json.dumps({'version': 1, 'to': 'a@example.com;b@example.com'}), encoding='utf-8')
         contacts = read_settings(self.path)['contacts']
-        self.assertEqual(contacts, [{'name': '', 'email': 'a@example.com'}, {'name': '', 'email': 'b@example.com'}])
+        self.assertEqual(contacts, contacts_with_defaults([{'name': '', 'email': 'a@example.com'}, {'name': '', 'email': 'b@example.com'}]))
         save_settings(self.path, contacts)
-        self.assertEqual(json.loads(p.read_text(encoding='utf-8'))['version'], 2)
+        self.assertEqual(json.loads(p.read_text(encoding='utf-8'))['version'], 3)
 
     def test_duplicate_email_names_are_unambiguous_and_invalid_rows_do_not_save(self):
         from quota_monitor.desktop_settings import save_settings
@@ -97,7 +105,7 @@ class DesktopSettingsTests(unittest.TestCase):
         c = Config.load(self.path)
         self.assertEqual(c.recipients, ['a@example.com'])
         self.assertEqual(c.section('notifications')['recipient_names'], {'a@example.com': '主邮箱'})
-        invalid = [[], [{'name': '备注', 'email': ''}], [{'name': '备注', 'email': 'a@example.com;b@example.com'}],
+        invalid = [[{'name': '备注', 'email': ''}], [{'name': '备注', 'email': 'a@example.com;b@example.com'}],
                    [{'name': 'x\ny', 'email': 'a@example.com'}], [{'name': 'x'*81, 'email': 'a@example.com'}],
                    [{'name': 123, 'email': 'a@example.com'}], [None],
                    [{'name': '甲', 'email': 'a@example.com'}, {'name': '乙', 'email': 'a@example.com'}]]

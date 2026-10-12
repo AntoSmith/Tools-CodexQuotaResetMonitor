@@ -13,7 +13,8 @@ namespace CodexQuotaDesktop
         static void Check(bool value, string message) { if (!value) throw new Exception(message); }
         static void Snapshot(Form form, string path)
         {
-            form.ShowInTaskbar = false; form.Show(); Application.DoEvents();
+            form.ShowInTaskbar = false; form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(-16000, -16000); form.Show(); Application.DoEvents();
             using (Bitmap bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(0, 0, form.Width, form.Height)); bitmap.Save(path, ImageFormat.Png); }
             form.Hide();
         }
@@ -34,10 +35,12 @@ namespace CodexQuotaDesktop
                 RecipientPreferences persisted = bridge.Save("a@example.com；b@example.com;c@example.com;a@example.com");
                 Check(persisted.Count == 3 && bridge.Read().Recipients == "a@example.com;b@example.com;c@example.com", "Bridge Unicode/dedup/persistence failed");
                 persisted = bridge.Save(new RecipientContact[] {
-                    new RecipientContact { Name = "我的主邮箱", Email = "a@example.com" },
+                    new RecipientContact { Name = "我的主邮箱", Email = "a@example.com", Enabled = false, AcceptUncertain = false,
+                        StartAt = "2026-09-01T08:00:00+08:00", EndAt = "2026-10-01T08:00:00+08:00", DeliveryMode = "quiet_night" },
                     new RecipientContact { Name = "工作通知", Email = "b@example.com" },
                     new RecipientContact { Name = "", Email = "c@example.com" } });
                 Check(bridge.Read().Contacts[0].Name == "我的主邮箱" && persisted.Contacts[1].Name == "工作通知", "Named recipient mapping lost");
+                Check(!bridge.Read().Contacts[0].Enabled && !persisted.Contacts[0].AcceptUncertain && persisted.Contacts[0].DeliveryMode == "quiet_night", "Subscription policy lost in native bridge");
                 bool rejected = false;
                 try { bridge.Save("invalid"); } catch (InvalidOperationException) { rejected = true; }
                 Check(rejected && bridge.Read().Recipients == "a@example.com;b@example.com;c@example.com", "Bridge invalid save changed settings");
@@ -49,7 +52,7 @@ namespace CodexQuotaDesktop
                 try { bridge.Save(new string('a', 20000)); }
                 catch (InvalidOperationException ex) { timedOut = ex.Message.Contains("超时"); }
                 Check(timedOut && timeoutWatch.Elapsed.TotalSeconds < 15, "Stalled settings helper exceeded its deadline");
-                bool startup = false; bool failWrite = false; bool failRecipients = false;
+                bool startup = false; bool failWrite = false; bool failRecipients = false; int testMails = 0;
                 RecipientContact[] recipients = new RecipientContact[] {
                     new RecipientContact { Name = "我的主邮箱", Email = "first@example.com" },
                     new RecipientContact { Name = "工作通知", Email = "second@example.com" },
@@ -62,26 +65,43 @@ namespace CodexQuotaDesktop
                         if (failRecipients) throw new InvalidOperationException("邮箱地址无效");
                         recipients = value;
                         return new RecipientPreferences { Contacts = value, Channel = "smtp", Count = value.Length, AppliedMessage = "监控已重新启动。" };
-                    })) {
+                    }, delegate(string email) { testMails++; Check(email == "first@example.com", "Wrong test recipient"); return "SMTP 服务器已接受测试邮件，请确认收件。"; })) {
                     Check(settings.RecipientsGrid.Rows.Count == 3 && Convert.ToString(settings.RecipientsGrid.Rows[0].Cells[0].Value) == "我的主邮箱", "Recipient settings not loaded");
                     settings.AddRecipient();
                     Check(settings.RecipientsGrid.Rows.Count == 4, "Add recipient failed");
                     settings.RemoveRecipient();
                     Check(settings.RecipientsGrid.Rows.Count == 3, "Remove recipient failed");
-                    settings.RecipientsGrid.Rows[0].Cells[0].Value = "我的常用邮箱";
+                    settings.RecipientsGrid.CurrentCell = settings.RecipientsGrid.Rows[0].Cells[0];
+                    settings.NameInput.Text = "演示订阅者";
+                    settings.EnabledSwitch.Checked = false;
+                    settings.UncertainSwitch.Checked = false;
+                    settings.LimitedSwitch.Checked = true;
+                    settings.DeliveryChoice.SelectedIndex = 2;
+                    settings.TestSelected().GetAwaiter().GetResult();
+                    Check(testMails == 0, "Unsaved edits sent a test email");
                     settings.SaveRecipients();
-                    Check(recipients[0].Name == "我的常用邮箱", "Name edit not submitted");
+                    Check(recipients[0].Name == "演示订阅者" && !recipients[0].Enabled && !recipients[0].AcceptUncertain && recipients[0].DeliveryMode == "digest_daily" && recipients[0].EndAt != "", "Policy edit not submitted: " + recipients[0].Name + "/" + recipients[0].Enabled + "/" + recipients[0].AcceptUncertain + "/" + recipients[0].DeliveryMode + "/" + recipients[0].EndAt);
                     Check(settings.RecipientStatus.Text.Contains("3") && settings.RecipientStatus.Text.Contains("重新启动"), "Recipient save not shown");
                     Check(!startup, "Recipient save changed startup registration");
                     failRecipients = true; settings.SaveRecipients();
                     Check(settings.RecipientStatus.Text.Contains("未保存"), "Recipient failure shown as success");
                     failRecipients = false; settings.SaveRecipients();
+                    settings.RecipientsGrid.CurrentCell = settings.RecipientsGrid.Rows[1].Cells[0];
+                    settings.RenewSubscription(); settings.SaveRecipients();
+                    DateTimeOffset renewedEnd = DateTimeOffset.Parse(recipients[1].EndAt);
+                    Check(Math.Abs((renewedEnd - DateTimeOffset.UtcNow.AddMonths(1)).TotalMinutes) < 2, "Unlimited subscription renewal exceeded one month");
+                    settings.RecipientsGrid.CurrentCell = settings.RecipientsGrid.Rows[0].Cells[0];
                     Check(!settings.StartupCheck.Checked, "Initial startup setting incorrect");
                     settings.Save(true); Check(startup && settings.StartupCheck.Checked, "Enable startup did not persist");
                     settings.Save(false); Check(!startup && !settings.StartupCheck.Checked, "Disable startup did not persist");
                     failWrite = true; settings.Save(true);
                     Check(!startup && settings.Status.Text.Contains("未保存"), "Failed write was reported as saved");
                     failWrite = false; settings.Save(true);
+                    var testTask = settings.TestSelected();
+                    while (!testTask.IsCompleted) { Application.DoEvents(); Thread.Sleep(10); }
+                    testTask.GetAwaiter().GetResult();
+                    Check(testMails == 1 && settings.RecipientStatus.Text.Contains("接受"), "Single-recipient test status missing");
+                    settings.EnabledSwitch.Checked = true; settings.SaveRecipients();
                     Snapshot(settings, Path.Combine(output, "settings-preview.png"));
                 }
                 using (MonitorProcess runner = new MonitorProcess(root)) {

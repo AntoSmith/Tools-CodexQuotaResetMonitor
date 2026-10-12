@@ -41,16 +41,16 @@ namespace CodexQuotaDesktop
 
     internal sealed class DashboardWindow : Form
     {
-        public readonly Button StartButton, StopButton, ConfigButton, LogButton, PreviewButton, LatestButton, SettingsButton;
+        public readonly Button StartButton, StopButton, ConfigButton, LogButton, PreviewButton, LatestButton, SettingsButton, HistoryButton;
         readonly Label badge, heading, description, rounds, failures, started, ended, next, nextTime, result, latest;
         public DashboardWindow()
         {
-            Text = "Codex 额度监控"; ClientSize = new Size(820, 590);
+            Text = AppBrand.Name; ClientSize = new Size(820, 590);
             AutoScaleMode = AutoScaleMode.Dpi; AutoScaleDimensions = new SizeF(96, 96);
             BackColor = Palette.Canvas; Font = new Font("Microsoft YaHei UI", 9F);
             StartPosition = FormStartPosition.CenterScreen; FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false; Icon = AppBrand.Icon;
-            Palette.Text(this, "Codex 额度监控", 28, 23, 520, 36, 21, Palette.Ink, true);
+            Palette.Text(this, AppBrand.Name, 28, 23, 580, 36, 21, Palette.Ink, true);
             Palette.Text(this, "关注新线索，让等待有迹可循。", 30, 66, 510, 26, 10, Palette.Muted, false);
             badge = Palette.Text(this, "已停止", 634, 34, 154, 32, 10, Palette.Muted, true);
             badge.TextAlign = ContentAlignment.MiddleCenter;
@@ -81,8 +81,9 @@ namespace CodexQuotaDesktop
             LogButton = Palette.Button(this, "查看日志", 650, 400, 142);
 
             Card recent = new Card(28, 462, 764, 77); Controls.Add(recent);
-            Palette.Text(recent, "最近发现", 17, 11, 540, 22, 9, Palette.Muted, false);
-            latest = Palette.Text(recent, "本次尚无新线索", 17, 38, 566, 26, 10, Palette.Ink, false);
+            Palette.Text(recent, "最近发现", 17, 11, 435, 22, 9, Palette.Muted, false);
+            latest = Palette.Text(recent, "本次尚无新线索", 17, 38, 435, 26, 10, Palette.Ink, false);
+            HistoryButton = Palette.Button(recent, "历史线索", 466, 18, 135);
             LatestButton = Palette.Button(recent, "查看线索", 610, 18, 135); LatestButton.Enabled = false;
             Palette.Text(this, "关闭窗口收回托盘 · 登录自启动可在右上角设置中查看 · 电脑休眠时暂停采集", 30, 554, 758, 25, 9, Palette.Muted, false);
         }

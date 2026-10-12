@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" role="img" aria-labelledby="title desc">
+  <title id="title">Codex 额度重置消息监控 · 功能概览</title>
+  <desc id="desc">多源发现、对话上文、后台监控、个性化邮件、订阅管理、历史分类。</desc>
+  <defs>
+    <linearGradient id="back" x2="1" y2="1"><stop stop-color="#102d37"/><stop offset="1" stop-color="#183d45"/></linearGradient>
+    <linearGradient id="card" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f3faf8"/></linearGradient>
+  </defs>
+  <rect width="1200" height="480" rx="24" fill="url(#back)"/>
+  <circle cx="1140" cy="20" r="160" fill="#244a50" opacity=".6"/>
+  <circle cx="35" cy="462" r="120" fill="#21555a" opacity=".4"/>
+  <g font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif">
+    <text x="42" y="49" fill="#8dddc8" font-size="15" font-weight="700" letter-spacing="2">DISCOVER · UNDERSTAND · REMEMBER</text>
+    <text x="42" y="90" fill="#ffffff" font-size="30" font-weight="700">消息有出处，提醒有偏好，判断有记录。</text>
+    <text x="42" y="120" fill="#a8c8c8" font-size="16">本地运行的额度重置消息助手</text>
+    <g transform="translate(42 148)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#30a58e"/>
+      <circle cx="34" cy="38" r="17" fill="#e0f3ed"/>
+      <g stroke="#168176" stroke-width="2.2" fill="none"><circle cx="32" cy="36" r="7"/><path d="m37 41 6 6"/></g>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">多源发现</text>
+      <text x="24" y="81" fill="#577179" font-size="17">公开索引定位 · X 页面读取</text>
+      <text x="24" y="108" fill="#577179" font-size="17">在分散的消息中寻找重置线索</text>
+    </g>
+    <g transform="translate(422 148)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#30a58e"/>
+      <circle cx="34" cy="38" r="17" fill="#e0f3ed"/>
+      <path d="M25 30h18v13H33l-6 5v-5h-2z" stroke="#168176" stroke-width="2" fill="none"/>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">对话上文</text>
+      <text x="24" y="81" fill="#577179" font-size="17">读取可见上文 · 保留判断依据</text>
+      <text x="24" y="108" fill="#577179" font-size="17">含糊回应标为待核实</text>
+    </g>
+    <g transform="translate(802 148)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#30a58e"/>
+      <circle cx="34" cy="38" r="17" fill="#e0f3ed"/>
+      <g stroke="#168176" stroke-width="2" fill="none"><rect x="24" y="30" width="20" height="14" rx="2"/><path d="M34 44v5m-6 0h12"/></g>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">后台监控</text>
+      <text x="24" y="81" fill="#577179" font-size="17">托盘运行 · 自启动 · 轮次状态</text>
+      <text x="24" y="108" fill="#577179" font-size="17">新线索弹窗，日常工作少打扰</text>
+    </g>
+    <g transform="translate(42 304)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#5471b3"/>
+      <circle cx="34" cy="38" r="17" fill="#e8eefb"/>
+      <g stroke="#4761ac" stroke-width="2" fill="none"><rect x="24" y="31" width="20" height="15" rx="2"/><path d="m24 32 10 8 10-8"/></g>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">个性化邮件</text>
+      <text x="24" y="81" fill="#577179" font-size="17">原文出处 · 北京时间 · 卡通动图</text>
+      <text x="24" y="108" fill="#577179" font-size="17">即时 / 汇总 / 夜间免打扰</text>
+    </g>
+    <g transform="translate(422 304)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#5471b3"/>
+      <circle cx="34" cy="38" r="17" fill="#e8eefb"/>
+      <g stroke="#4761ac" stroke-width="2" fill="none"><circle cx="34" cy="33" r="5"/><path d="M24 47c0-11 20-11 20 0"/></g>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">订阅管理</text>
+      <text x="24" y="81" fill="#577179" font-size="17">备注邮箱 · 起止时间 · 发送偏好</text>
+      <text x="24" y="108" fill="#577179" font-size="17">每位收件人单独设置与测试</text>
+    </g>
+    <g transform="translate(802 304)">
+      <rect width="356" height="134" rx="14" fill="url(#card)"/>
+      <rect width="5" height="80" y="27" rx="2.5" fill="#5471b3"/>
+      <circle cx="34" cy="38" r="17" fill="#e8eefb"/>
+      <g stroke="#4761ac" stroke-width="2" fill="none"><rect x="25" y="28" width="18" height="20" rx="2"/><path d="M29 34h10m-10 5h10m-10 5h6"/></g>
+      <text x="63" y="44" fill="#173c40" font-size="23" font-weight="700">历史分类</text>
+      <text x="24" y="81" fill="#577179" font-size="17">四色人工标记 · 分类筛选</text>
+      <text x="24" y="108" fill="#577179" font-size="17">原文和判断一同保留，随时回看</text>
+    </g>
+  </g>
+</svg>

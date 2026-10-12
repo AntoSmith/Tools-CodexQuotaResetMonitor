@@ -13,4 +13,9 @@ if ($process.ExitCode -ne 0) { throw 'Process lifecycle test failed; read data/d
 $process = Start-Process -FilePath $Exe -ArgumentList '--ui-test' -WorkingDirectory $root -WindowStyle Hidden -PassThru
 if (-not $process.WaitForExit(25000)) { throw 'UI feedback test timed out' }
 if ($process.ExitCode -ne 0) { throw 'UI feedback test failed; read data/desktop/ui-test.txt' }
-Write-Output 'Desktop preflight, UI feedback, final stdout, process start/stop and child cleanup passed.'
+$process = Start-Process -FilePath $Exe -ArgumentList '--history-ui-test' -WorkingDirectory $root -WindowStyle Hidden -PassThru
+if (-not $process.WaitForExit(25000)) { throw 'History UI test timed out' }
+if ($process.ExitCode -ne 0) { throw 'History UI test failed; read data/desktop/history-ui-test.txt' }
+$historyReport = Join-Path $root 'data/desktop/history-ui-test.txt'
+if ((Get-Content -LiteralPath $historyReport -Raw) -notmatch '^PASS') { throw 'Missing successful history UI test report' }
+Write-Output 'Desktop preflight, UI feedback, history review, final stdout, process start/stop and child cleanup passed.'

@@ -18,9 +18,11 @@ namespace CodexQuotaDesktop
         readonly string root;
         bool closing;
         AlertWindow popup;
+        HistoryWindow historyWindow;
+        readonly IHistoryRepository history;
         public TrayApplication(string root, bool hidden, bool launch)
         {
-            this.root = root; monitor = new MonitorProcess(root); window = new DashboardWindow();
+            this.root = root; monitor = new MonitorProcess(root); window = new DashboardWindow(); history = new HistoryClient(root);
             window.StartButton.Click += delegate { StartMonitor(); };
             window.StopButton.Click += delegate { StopMonitor(); };
             window.ConfigButton.Click += delegate { OpenConfig(); };
@@ -28,11 +30,13 @@ namespace CodexQuotaDesktop
             window.LogButton.Click += delegate { OpenLog(); };
             window.PreviewButton.Click += delegate { ShowAlert(DesktopAlert.Preview()); };
             window.LatestButton.Click += delegate { if (state.LastAlert != null) ShowAlert(state.LastAlert); };
+            window.HistoryButton.Click += delegate { OpenHistory(); };
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Items.Add("显示状态", null, delegate { ShowWindow(); });
             startItem = new ToolStripMenuItem("启动监控", null, delegate { StartMonitor(); }); menu.Items.Add(startItem);
             stopItem = new ToolStripMenuItem("停止监控", null, delegate { StopMonitor(); }); menu.Items.Add(stopItem);
             menu.Items.Add("预览提醒效果", null, delegate { ShowAlert(DesktopAlert.Preview()); });
+            menu.Items.Add("历史线索", null, delegate { OpenHistory(); });
             menu.Items.Add("打开配置", null, delegate { OpenConfig(); });
             menu.Items.Add("查看日志", null, delegate { OpenLog(); });
             menu.Items.Add("设置", null, delegate { OpenSettings(); });
@@ -43,7 +47,7 @@ namespace CodexQuotaDesktop
             };
             menu.Items.Add(startupItem); menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("退出并停止监控", null, delegate { Quit(); });
-            tray = new NotifyIcon { Icon = AppBrand.Icon, Text = "Codex 额度监控", ContextMenuStrip = menu, Visible = launch };
+            tray = new NotifyIcon { Icon = AppBrand.Icon, Text = AppBrand.Name, ContextMenuStrip = menu, Visible = launch };
             tray.DoubleClick += delegate { ShowWindow(); };
             window.FormClosing += delegate(object sender, FormClosingEventArgs e) {
                 if (e.CloseReason == CloseReason.WindowsShutDown) { Quit(); return; }
@@ -69,7 +73,7 @@ namespace CodexQuotaDesktop
         void Refresh()
         {
             window.RefreshState(state); startItem.Enabled = !state.Active; stopItem.Enabled = state.Active;
-            tray.Text = state.Active ? (state.Phase == "collecting" ? "Codex 额度监控：正在采集" : "Codex 额度监控：运行中") : "Codex 额度监控：已停止";
+            tray.Text = AppBrand.Name + (state.Active ? (state.Phase == "collecting" ? "：正在采集" : "：运行中") : "：已停止");
         }
         void ShowWindow() { window.Show(); window.WindowState = FormWindowState.Normal; window.Activate(); }
         void StartMonitor()
@@ -87,9 +91,17 @@ namespace CodexQuotaDesktop
         void ShowAlert(DesktopAlert alert)
         {
             if (popup != null) { popup.Activate(); return; }
-            popup = new AlertWindow(alert);
+            popup = new AlertWindow(alert, history);
+            popup.ReviewSaved += async delegate(HistoryItem item) { if (historyWindow != null) await historyWindow.RefreshAsync(); };
             popup.FormClosed += delegate { popup.Dispose(); popup = null; };
             popup.Show();
+        }
+        async void OpenHistory()
+        {
+            if (historyWindow != null) { historyWindow.Show(); historyWindow.WindowState = FormWindowState.Normal; historyWindow.Activate(); await historyWindow.RefreshAsync(); return; }
+            historyWindow = new HistoryWindow(history);
+            historyWindow.FormClosed += delegate { historyWindow.Dispose(); historyWindow = null; };
+            historyWindow.Show();
         }
         void OpenConfig() { OpenText(Path.Combine(root, "config.browser.local.toml")); }
         void OpenSettings()
@@ -99,14 +111,17 @@ namespace CodexQuotaDesktop
                 delegate { Process.Start(new ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }); },
                 delegate { OpenText(Path.Combine(root, "logs", "desktop-startup.log")); },
                 recipients.Read, delegate(RecipientContact[] value) {
-                    RecipientPreferences saved = recipients.Save(value);
                     bool running = state.Active && monitor.Running;
+                    if (running) StopMonitor();
+                    // Stop the old worker before publishing a new policy. A
+                    // failed queue reconciliation must leave delivery stopped.
+                    RecipientPreferences saved = recipients.Save(value);
                     if (running) {
-                        StopMonitor(); StartMonitor();
+                        StartMonitor();
                         saved.AppliedMessage = state.Active ? "监控已重新启动，新名单已提交加载。" : "监控重启失败，请返回主窗口查看原因；名单已保存。";
                     } else saved.AppliedMessage = "下次启动监控时生效。";
                     return saved;
-                })) settings.ShowDialog(window);
+                }, recipients.Test)) settings.ShowDialog(window);
             RefreshStartup();
         }
         void RefreshStartup()
@@ -125,6 +140,7 @@ namespace CodexQuotaDesktop
             if (closing) return; closing = true;
             timer.Stop(); state.Stopped(""); monitor.Dispose();
             if (popup != null) popup.Close();
+            if (historyWindow != null) historyWindow.Close();
             tray.Visible = false; tray.Dispose(); window.Dispose(); timer.Dispose(); ExitThread();
         }
     }

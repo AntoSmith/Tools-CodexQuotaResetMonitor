@@ -217,7 +217,7 @@ namespace CodexQuotaDesktop
             try { return MainCore(args); }
             catch (Exception ex) {
                 LaunchLog(root, "fatal " + ex.GetType().Name);
-                if (args.Length == 0) MessageBox.Show("程序启动失败，请查看 logs/desktop-startup.log。\n" + ex.Message, "Codex 额度监控");
+                if (args.Length == 0) MessageBox.Show("程序启动失败，请查看 logs/desktop-startup.log。\n" + ex.Message, AppBrand.Name);
                 return 1;
             }
             finally { if (diagnostic) LaunchLog(root, "exit"); }
@@ -238,6 +238,7 @@ namespace CodexQuotaDesktop
             Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
             string mode = args.Length == 0 ? "" : args[0];
             if (mode == "--ui-test") return UiVerification.Run(root);
+            if (mode == "--history-ui-test") return HistoryVerification.Run(root);
             if (mode == "--self-test" || mode == "--lifecycle-test") return SelfTest(root, mode);
             if (mode == "--enable-startup" || mode == "--disable-startup")
             {
@@ -254,7 +255,7 @@ namespace CodexQuotaDesktop
                 if (!created)
                 {
                     LaunchLog(root, "existing_instance");
-                    if (mode != "--autostart") MessageBox.Show("程序已经运行，请查看右下角托盘图标。", "Codex 额度监控");
+                    if (mode != "--autostart") MessageBox.Show("程序已经运行，请查看右下角托盘图标。", AppBrand.Name);
                     return 0;
                 }
                 TrayApplication app = null;

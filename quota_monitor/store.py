@@ -29,6 +29,11 @@ class Store:
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
             CREATE TABLE IF NOT EXISTS mail_deliveries (
                 outbox_id INTEGER, recipient TEXT, PRIMARY KEY(outbox_id, recipient));
+            CREATE TABLE IF NOT EXISTS mail_jobs (
+                outbox_id INTEGER, recipient TEXT, due REAL, scheduled REAL, mode TEXT,
+                state TEXT DEFAULT 'pending', attempts INTEGER DEFAULT 0, batch_key TEXT,
+                PRIMARY KEY(outbox_id, recipient));
+            CREATE INDEX IF NOT EXISTS mail_jobs_due ON mail_jobs(state,due);
         ''')
         if 'expires' not in {r[1] for r in self.db.execute('PRAGMA table_info(outbox)')}:
             self.db.execute('ALTER TABLE outbox ADD COLUMN expires REAL')
@@ -39,6 +44,10 @@ class Store:
                 # Do not assign their historical queue to newly configured emails.
                 self.db.execute("UPDATE outbox SET destination=? WHERE state='pending'",
                                 (self.get('destination') or 'unknown:',))
+        if 'created' not in {r[1] for r in self.db.execute('PRAGMA table_info(outbox)')}:
+            with self.transaction():
+                self.db.execute('ALTER TABLE outbox ADD COLUMN created REAL')
+                self.db.execute('UPDATE outbox SET created=due WHERE created IS NULL')
 
     @contextmanager
     def transaction(self):
@@ -68,8 +77,9 @@ class Store:
     def enqueue(self, key, title, body, now=None, due=None, group='', expires=None, destination=None):
         with self.lock:
             destination = destination if destination is not None else self.get('destination')
-            return self.db.execute('INSERT OR IGNORE INTO outbox(event_key,title,body,due,group_id,expires,destination) VALUES (?,?,?,?,?,?,?)',
-                                   (key, title, body, due if due is not None else (now if now is not None else time.time()), group, expires, destination)).rowcount == 1
+            created = now if now is not None else (due if due is not None else time.time())
+            return self.db.execute('INSERT OR IGNORE INTO outbox(event_key,title,body,due,group_id,expires,destination,created) VALUES (?,?,?,?,?,?,?,?)',
+                                   (key, title, body, due if due is not None else created, group, expires, destination, created)).rowcount == 1
 
     def configure_delivery(self, destination):
         """Reconcile queued targets, without binding collection history to recipients.
@@ -80,7 +90,7 @@ class Store:
         """
         destination = normalize_destination(destination)
         channel, _, addresses = destination.partition(':')
-        current = set(parse_recipients(addresses)) if channel == 'smtp' else set()
+        current = set(parse_recipients(addresses)) if channel == 'smtp' and addresses else set()
         with self.transaction():
             previous = self.get('destination')
             self.db.execute("UPDATE outbox SET destination=? WHERE state='pending' AND destination IS NULL",
@@ -93,7 +103,7 @@ class Store:
                 if channel != old_channel:
                     state = 'cancelled'
                 elif channel == 'smtp':
-                    remaining = sorted(set(parse_recipients(old_addresses)) & current)
+                    remaining = sorted(set(parse_recipients(old_addresses) if old_addresses else []) & current)
                     if not remaining:
                         state = 'cancelled'
                     else:
@@ -122,6 +132,27 @@ class Store:
             return [dict(r) for r in self.db.execute(
                 "SELECT * FROM outbox WHERE state='pending' AND due<=? ORDER BY id LIMIT 50",
                 (now,))]
+
+    def mail_pending(self, now):
+        """All pending events, including future reminders; no due-row starvation."""
+        with self.lock:
+            self.db.execute("UPDATE outbox SET state='expired' WHERE state='pending' AND expires<=?", (now,))
+            return [dict(row) for row in self.db.execute("SELECT * FROM outbox WHERE state='pending' ORDER BY id")]
+
+    def finish_mail_jobs(self):
+        """Finalize only events with jobs, without inventing successful receipts."""
+        with self.transaction():
+            self.db.execute("""UPDATE mail_jobs SET state='cancelled' WHERE state='pending'
+                AND outbox_id IN (SELECT id FROM outbox WHERE state!='pending')""")
+            rows = self.db.execute("""SELECT o.id,
+                    EXISTS(SELECT 1 FROM mail_jobs j WHERE j.outbox_id=o.id AND j.state='sent') AS sent
+                FROM outbox o WHERE o.state='pending'
+                AND EXISTS(SELECT 1 FROM mail_jobs j WHERE j.outbox_id=o.id)
+                AND NOT EXISTS(SELECT 1 FROM mail_jobs j WHERE j.outbox_id=o.id AND j.state='pending')""").fetchall()
+            for row in rows:
+                self.db.execute('UPDATE outbox SET state=? WHERE id=?',
+                                ('sent' if row['sent'] else 'cancelled', row['id']))
+            return sum(bool(row['sent']) for row in rows)
 
     def sent(self, row_id):
         with self.transaction():

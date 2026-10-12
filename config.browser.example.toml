@@ -29,7 +29,8 @@ host = "smtp.qq.com"
 port = 465
 username = "sender@example.com"  # 发件邮箱；示例地址必须替换
 to = "recipient@example.com"     # 收件邮箱；示例地址必须替换
-# 也可在桌面“设置 → 收件人”填写备注和邮箱；保存后自动同步，界面名单优先。
+# 桌面“设置 → 订阅管理”可设置备注/邮箱、启停、起止时间、待核实开关及发信偏好。
+# 保存后自动同步，界面名单优先；本机名单保存在 data/desktop，不上传。
 # 多收件人用分号分隔，不限两个：to = "first@example.com;second@example.com;third@example.com"
 # 支持中文分号，兼容中英文冒号和逗号；地址自动去重，不支持空项或换行。
 QQ_SMTP_AUTH_CODE = ""      # QQ SMTP 授权码，不是登录密码；也可通过同名环境变量提供

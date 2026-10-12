@@ -1,13 +1,10 @@
-import hashlib
 import smtplib
 import ssl
 import sys
 import time
-from email.message import EmailMessage
-from email.utils import formatdate
 
 from .config import parse_recipients
-from .email_html import render_email
+from .email_message import build_message
 
 
 class ConsoleNotifier:
@@ -35,15 +32,7 @@ class SMTPNotifier:
         n = self.settings
         self.config.validate_smtp_auth()
         auth_code = self.config.smtp_auth_code
-        message = EmailMessage()
-        message['Subject'] = row['title']
-        message['From'] = n['username']
-        message['To'] = recipient
-        message['Date'] = formatdate(localtime=False)
-        digest = hashlib.sha256((recipient + row['event_key']).encode()).hexdigest()
-        message['Message-ID'] = f'<{digest}@codex-quota-monitor.local>'
-        message.set_content(row['body'])
-        message.add_alternative(render_email(row['title'], row['body']), subtype='html')
+        message = build_message(self.config, row, recipient)
         accepted = False
         try:
             with self.factory(n.get('host', 'smtp.qq.com'), n.get('port', 465),
@@ -61,6 +50,9 @@ class SMTPNotifier:
 
 def deliver(store, notifier, now=None):
     store.configure_delivery(notifier.config.destination if isinstance(notifier, SMTPNotifier) else 'console:')
+    if isinstance(notifier, SMTPNotifier) and notifier.config.recipient_contacts is not None:
+        from .delivery import deliver_subscriptions
+        return deliver_subscriptions(store, notifier, now)
     fixed_now = now
     now = time.time() if now is None else now
     ok = failed = 0

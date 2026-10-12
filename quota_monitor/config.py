@@ -27,6 +27,8 @@ def parse_recipients(value):
 
 def normalize_destination(value):
     if value.startswith('smtp:'):
+        if value == 'smtp:':
+            return value
         return 'smtp:' + ':'.join(sorted(parse_recipients(value[5:])))
     return value
 
@@ -51,12 +53,36 @@ class Config:
 
     @property
     def recipients(self):
+        contacts = self.recipient_contacts
+        if contacts is not None:
+            return [contact['email'] for contact in contacts]
         return parse_recipients(self.section('notifications').get('to', ''))
+
+    @property
+    def recipient_contacts(self):
+        n = self.section('notifications')
+        if 'recipient_contacts' not in n:
+            return None
+        from .subscription import normalize_policy
+        values = n['recipient_contacts']
+        if not isinstance(values, list):
+            raise ConfigError('订阅联系人必须是列表')
+        result, seen = [], set()
+        for contact in values:
+            policy = normalize_policy(contact)
+            addresses = parse_recipients(contact.get('email', ''))
+            if len(addresses) != 1 or addresses[0] in seen:
+                raise ConfigError('每个订阅联系人须使用唯一的单个邮箱地址')
+            seen.add(addresses[0])
+            result.append({**contact, **policy, 'email': addresses[0]})
+        return result
 
     @property
     def destination(self):
         n = self.section('notifications')
-        return normalize_destination(n.get('channel', 'console') + ':' + n.get('to', ''))
+        channel = n.get('channel', 'console')
+        target = ';'.join(self.recipients) if channel == 'smtp' else n.get('to', '')
+        return normalize_destination(channel + ':' + target)
 
     @property
     def smtp_auth_code(self):
@@ -66,6 +92,8 @@ class Config:
         return value.strip() or os.environ.get('QQ_SMTP_AUTH_CODE', '').strip()
 
     def validate_smtp_auth(self):
+        if self.recipient_contacts == []:
+            return
         if self.section('notifications').get('channel') == 'smtp' and not self.smtp_auth_code:
             raise ConfigError('缺少 QQ_SMTP_AUTH_CODE：请填写 notifications 配置或同名环境变量')
 

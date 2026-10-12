@@ -7,6 +7,7 @@ namespace CodexQuotaDesktop
 {
     internal static class AppBrand
     {
+        public const string Name = "Codex 额度重置消息监控";
         // Shared for the process lifetime, just like the former SystemIcons instance.
         public static readonly Icon Icon = LoadIcon();
         static Icon LoadIcon()

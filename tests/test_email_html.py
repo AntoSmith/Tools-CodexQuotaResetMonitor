@@ -20,7 +20,7 @@ class EmailHTMLTests(unittest.TestCase):
         SMTPNotifier(c, SMTP).send_to({'title': '[Codex] 待核实', 'body': body, 'event_key': 'post:123'}, 'a@example.com')
         message = captured[0]
         self.assertTrue(message.is_multipart())
-        self.assertEqual(message.get_body(preferencelist=('plain',)).get_content().strip(), body)
+        self.assertTrue(message.get_body(preferencelist=('plain',)).get_content().startswith(body))
         html = message.get_body(preferencelist=('html',)).get_content()
         self.assertIn('&lt;script&gt;', html)
         self.assertNotIn('<script>', html)
@@ -74,6 +74,39 @@ class EmailHTMLTests(unittest.TestCase):
         html = render_email('[Codex] 候选重置时间临近，请核实', body)
         self.assertIn('即将重置候选', html)
         self.assertIn('候选重置时间（北京时间）：2026-09-22 20:10:00', html)
+
+    def test_digest_does_not_label_whole_message_as_first_event(self):
+        from quota_monitor.email_html import render_email
+        body = '分类：已重置候选\n\n作者原文：\nExample one\n\n分类：待核实\n\n作者原文：\nExample two'
+        html = render_email('[Codex] 本次线索汇总（2 条）', body)
+        self.assertIn('>线索汇总</span>', html)
+        self.assertNotIn('>已重置候选</span>', html)
+        self.assertIn('Example two', html)
+
+    def test_welcome_test_has_no_fake_original_post_button(self):
+        from quota_monitor.email_html import render_email
+        html = render_email('[Codex] 欢迎 · 邮箱收信测试', '非重置公告')
+        self.assertNotIn('演示按钮', html)
+        self.assertIn('测试邮件', html)
+
+    def test_preferences_and_inline_mascot_keep_original_readable(self):
+        from quota_monitor.email_html import render_email
+        policy = dict(delivery_mode='quiet_night', accept_uncertain=False, enabled=True,
+                      start_at='2026-09-22T10:00:00+08:00', end_at='2026-10-22T10:00:00+08:00')
+        html = render_email('[Codex 邮件测试] 待核实', '分类：待核实\n\n作者原文：\nMaybe <script>x</script>',
+                            preferences=policy, mascot_cid='quota-mascot.' + 'a' * 32 + '@codex-quota-monitor.local')
+        for text in ('你的接收偏好', '22:00', '08:00', '不接收', '2026-10-22 10:00', 'cid:quota-mascot', '&lt;script&gt;'):
+            self.assertIn(text, html)
+        self.assertIn('等待进一步确认', html)
+        self.assertNotIn('<script>', html)
+
+    def test_mascot_url_cannot_be_injected_and_completed_is_not_account_confirmation(self):
+        from quota_monitor.email_html import render_email
+        html = render_email('[Codex] 已重置候选', '分类：已重置候选\n\n作者原文：\nReset done.',
+                            mascot_cid='evil" onerror="bad')
+        self.assertNotIn('onerror=', html)
+        self.assertNotIn('<img', html)
+        self.assertIn('实际账户', html)
 
 
 if __name__ == '__main__': unittest.main()

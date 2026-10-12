@@ -37,6 +37,9 @@ if ($state.RoundsCompleted -ne 0 -or $state.Failures -ne 0) { throw 'Session cou
 # Refresh a real, unshown dashboard across an empty round and recovery. No monitor is launched.
 $windowType = $assembly.GetType('CodexQuotaDesktop.DashboardWindow')
 $window = [Activator]::CreateInstance($windowType)
+$historyField = $windowType.GetField('HistoryButton')
+if ($null -eq $historyField) { throw 'History entry must be present even before the first monitoring round' }
+if ($window.Text -ne 'Codex 额度重置消息监控' -or -not $historyField.GetValue($window).Enabled) { throw 'Updated brand and always-accessible history entry are required' }
 $fields = [Reflection.BindingFlags]'Instance, NonPublic'
 $resultLabel = $windowType.GetField('result', $fields).GetValue($window)
 $endedLabel = $windowType.GetField('ended', $fields).GetValue($window)

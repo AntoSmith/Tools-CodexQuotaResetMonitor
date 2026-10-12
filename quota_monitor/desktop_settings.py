@@ -8,6 +8,7 @@ import unicodedata
 from pathlib import Path
 
 from .config import Config, ConfigError, parse_recipients
+from .subscription import normalize_policy
 
 
 def settings_path(config_path):
@@ -17,9 +18,9 @@ def settings_path(config_path):
 
 def normalize_contacts(value):
     if isinstance(value, str):
-        return [{'name': '', 'email': email} for email in parse_recipients(value)]
-    if not isinstance(value, list) or not value:
-        raise ConfigError('请至少添加一个收件邮箱')
+        value = [{'name': '', 'email': email} for email in parse_recipients(value)]
+    if not isinstance(value, list):
+        raise ConfigError('收件人名单格式无效')
     result = {}
     for index, contact in enumerate(value, 1):
         if not isinstance(contact, dict):
@@ -34,10 +35,14 @@ def normalize_contacts(value):
         except ConfigError:
             raise ConfigError(f'第 {index} 行邮箱地址无效，请检查后再保存') from None
         name = name.strip()
-        if address in result and name and result[address] and result[address] != name:
-            raise ConfigError(f'第 {index} 行邮箱已存在且备注不同，请合并为一行')
-        result[address] = name or result.get(address, '')
-    return [{'name': name, 'email': address} for address, name in result.items()]
+        policy = normalize_policy(contact)
+        if address in result:
+            old = result[address]
+            if (name and old['name'] and old['name'] != name) or normalize_policy(old) != policy:
+                raise ConfigError(f'第 {index} 行邮箱已存在且备注或订阅设置不同，请合并为一行')
+            name = name or old['name']
+        result[address] = {'name': name, 'email': address, **policy}
+    return list(result.values())
 
 
 def apply_settings(data, config_path):
@@ -46,7 +51,7 @@ def apply_settings(data, config_path):
         return
     try:
         value = json.loads(path.read_text(encoding='utf-8'))
-        if not isinstance(value, dict) or value.get('version') not in (1, 2):
+        if not isinstance(value, dict) or value.get('version') not in (1, 2, 3):
             raise ValueError('schema')
         contacts = normalize_contacts(value.get('to') if value['version'] == 1 else value.get('contacts'))
     except (ValueError, OSError, UnicodeError):
@@ -54,13 +59,16 @@ def apply_settings(data, config_path):
     notification = data.setdefault('notifications', {})
     notification['to'] = ';'.join(c['email'] for c in contacts)
     notification['recipient_names'] = {c['email']: c['name'] for c in contacts}
+    notification['recipient_contacts'] = contacts
 
 
 def read_settings(config_path):
     config = Config.load(config_path)
     value = config.section('notifications').get('to', '')
     names = config.section('notifications').get('recipient_names', {})
-    contacts = [{'name': names.get(email, ''), 'email': email} for email in parse_recipients(value)] if value else []
+    contacts = config.section('notifications').get('recipient_contacts')
+    if contacts is None:
+        contacts = normalize_contacts([{'name': names.get(email, ''), 'email': email} for email in parse_recipients(value)]) if value else []
     return {'recipients': value, 'contacts': contacts, 'channel': config.section('notifications').get('channel', 'console'),
             'source': 'settings' if settings_path(config_path).exists() else 'config'}
 
@@ -70,11 +78,10 @@ def save_settings(config_path, value):
     if isinstance(value, str):
         # An older desktop build may still submit a flat list. Keep existing names.
         try:
-            names = {c['email']: c['name'] for c in read_settings(config_path)['contacts']}
+            previous = {c['email']: c for c in read_settings(config_path)['contacts']}
         except ConfigError:
-            names = {}
-        for contact in contacts:
-            contact['name'] = names.get(contact['email'], '')
+            previous = {}
+        contacts = [previous.get(c['email'], c) for c in contacts]
     # Only read base TOML: a corrupt override must remain repairable from the UI.
     config = Config.load(config_path, use_desktop_settings=False)
     path = settings_path(config_path)
@@ -84,7 +91,7 @@ def save_settings(config_path, value):
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
                                          prefix='.recipients-', suffix='.tmp', delete=False) as f:
             temporary = f.name
-            json.dump({'version': 2, 'contacts': contacts}, f, ensure_ascii=False)
+            json.dump({'version': 3, 'contacts': contacts}, f, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
         os.replace(temporary, path)
@@ -92,6 +99,20 @@ def save_settings(config_path, value):
     finally:
         if temporary is not None:
             Path(temporary).unlink(missing_ok=True)
+    # Persist cancellations even while collection is stopped. No delivery or
+    # database creation here; later enabling must not resurrect queued notices.
+    if config.database.exists():
+        try:
+            from .delivery import reconcile_subscriptions
+            from .store import Store
+            effective = Config.load(config_path)
+            store = Store(config.database)
+            try:
+                reconcile_subscriptions(store, effective)
+            finally:
+                store.close()
+        except Exception:
+            raise ConfigError('名单已保存，但待发队列更新未确认；请保持监控停止，重新保存成功后再启动') from None
     return {'recipients': '; '.join(c['email'] for c in contacts), 'contacts': contacts,
             'count': len(contacts), 'source': 'settings',
             'channel': config.section('notifications').get('channel', 'console')}
@@ -99,7 +120,7 @@ def save_settings(config_path, value):
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['read', 'save'])
+    parser.add_argument('action', choices=['read', 'save', 'test'])
     parser.add_argument('--config', default='config.browser.local.toml')
     args = parser.parse_args(argv)
     try:
@@ -109,7 +130,11 @@ def main(argv=None):
             request = json.loads(sys.stdin.read(65536))
             if not isinstance(request, dict):
                 raise ConfigError('邮箱设置请求格式无效')
-            result = save_settings(args.config, request['contacts'] if 'contacts' in request else request.get('recipients'))
+            if args.action == 'test':
+                from .subscription_test import send_test
+                result = send_test(args.config, request.get('email'))
+            else:
+                result = save_settings(args.config, request['contacts'] if 'contacts' in request else request.get('recipients'))
         print(json.dumps({'ok': True, **result}, ensure_ascii=False))
         return 0
     except (ValueError, OSError) as exc:

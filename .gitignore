@@ -40,6 +40,7 @@ Thumbs.db
 # Internal investigation notes contain local paths and runtime history.
 docs/*
 !docs/PUBLISH.md
+!docs/USAGE.md
 
 # A separate, reproducible source-only publishing directory.
 github-export/

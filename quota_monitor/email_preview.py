@@ -1,8 +1,8 @@
 """Create an offline synthetic email preview; never read config or send mail."""
-from email.message import EmailMessage
 from pathlib import Path
 
-from .email_html import render_email
+from .email_message import build_message, preview_html
+from .config import Config
 
 
 def main():
@@ -19,14 +19,11 @@ def main():
             '仅作为待核实线索，不据此承诺重置或生成倒计时。')
     output = Path('data/email-preview')
     output.mkdir(parents=True, exist_ok=True)
-    html = render_email(title + ' · 待核实', body)
-    (output / 'email-demo.html').write_text(html, encoding='utf-8')
-    message = EmailMessage()
-    message['Subject'] = title
-    message['From'] = 'preview@example.com'
-    message['To'] = 'demo@example.com'
-    message.set_content(body)
-    message.add_alternative(html, subtype='html')
+    config = Config({'notifications': {'username':'preview@example.com', 'recipient_contacts':[
+        {'email':'demo@example.com', 'delivery_mode':'quiet_night','accept_uncertain':True,
+         'start_at':'2026-09-22T10:00:00+08:00','end_at':'2026-10-22T10:00:00+08:00'}]}})
+    message = build_message(config, {'title': title + ' · 待核实','body':body,'event_key':'offline-demo'}, 'demo@example.com')
+    (output / 'email-demo.html').write_text(preview_html(message), encoding='utf-8')
     (output / 'email-demo.eml').write_bytes(message.as_bytes())
     print(str((output / 'email-demo.html').resolve()))
     print('离线合成演示；未读取个人配置，未联网，未发送邮件。')
