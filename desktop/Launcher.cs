@@ -101,7 +101,11 @@ namespace CodexQuotaDesktop
         public static string GatedCode(string code) { return "import sys,runpy;sys.exit(0) if sys.stdin.readline().strip()!='start' else None;" + code; }
         public string Runtime(string name)
         {
-            string path = File.ReadAllText(Path.Combine(root, "data", "desktop", name + "-path.txt")).Trim();
+            string bundled = Path.Combine(root, "runtime", name, name + ".exe");
+            if (File.Exists(bundled)) return bundled;
+            string marker = Path.Combine(root, "data", "desktop", name + "-path.txt");
+            if (!File.Exists(marker)) throw new FileNotFoundException("找不到 " + name + " 运行环境，请重新解压完整便携包或运行构建脚本。", marker);
+            string path = File.ReadAllText(marker).Trim();
             if (!Path.IsPathRooted(path) || !File.Exists(path)) throw new FileNotFoundException("找不到 " + name + "，请重新运行构建脚本。 ");
             return path;
         }
@@ -184,6 +188,56 @@ namespace CodexQuotaDesktop
         public void Dispose() { Stop(); }
     }
 
+    internal static class PortableConfiguration
+    {
+        public static string SelectBrowserChannel(bool chromeInstalled, bool edgeInstalled)
+        { return chromeInstalled || !edgeInstalled ? "chrome" : "msedge"; }
+        static bool BrowserInstalled(string relativePath)
+        {
+            // Match quota_monitor.background_browser._find_browser so setup only selects a supported installation.
+            foreach (string variable in new string[] { "PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA" })
+            {
+                string directory = Environment.GetEnvironmentVariable(variable);
+                if (!String.IsNullOrEmpty(directory) && File.Exists(Path.Combine(directory, relativePath))) return true;
+            }
+            return false;
+        }
+        public static string PreferredBrowserChannel()
+        {
+            return SelectBrowserChannel(BrowserInstalled(@"Google\Chrome\Application\chrome.exe"),
+                BrowserInstalled(@"Microsoft\Edge\Application\msedge.exe"));
+        }
+        public static bool EnsureLocalConfig(string root, string preferredBrowserChannel)
+        {
+            string config = Path.Combine(root, "config.browser.local.toml");
+            if (File.Exists(config)) return false;
+            string template = Path.Combine(root, "config.browser.example.toml");
+            if (!File.Exists(template)) throw new FileNotFoundException("找不到 config.browser.example.toml，请重新解压完整便携包后启动。", template);
+            string content = File.ReadAllText(template, Encoding.UTF8);
+            if (preferredBrowserChannel == "msedge")
+            {
+                content = System.Text.RegularExpressions.Regex.Replace(content,
+                    @"(?ms)(^[ \t]*\[browser\][^\r\n]*\r?\n)(.*?)(?=^[ \t]*\[|\z)", delegate(System.Text.RegularExpressions.Match section) {
+                        return section.Groups[1].Value + System.Text.RegularExpressions.Regex.Replace(section.Groups[2].Value,
+                            "(?m)^([ \\t]*channel[ \\t]*=[ \\t]*)([\"'])chrome\\2", delegate(System.Text.RegularExpressions.Match channel) {
+                                return channel.Groups[1].Value + channel.Groups[2].Value + "msedge" + channel.Groups[2].Value;
+                            });
+                    });
+            }
+            byte[] bytes = new UTF8Encoding(false).GetBytes(content);
+            FileStream output;
+            try {
+                output = new FileStream(config, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            } catch (IOException) {
+                // Another initializer won the exclusive create. Never truncate its local configuration.
+                if (File.Exists(config)) return false;
+                throw;
+            }
+            using (output) output.Write(bytes, 0, bytes.Length);
+            return true;
+        }
+    }
+
     internal static class Startup
     {
         public const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -235,8 +289,9 @@ namespace CodexQuotaDesktop
             string root = AppDomain.CurrentDomain.BaseDirectory;
             Directory.SetCurrentDirectory(root);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
             string mode = args.Length == 0 ? "" : args[0];
+            if (mode == "--portable-test") return PortableVerification.Run(args.Length > 1 ? args[1] : Path.Combine(root, "data", "desktop"));
+            if (mode != "" && mode != "--autostart") Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
             if (mode == "--ui-test") return UiVerification.Run(root);
             if (mode == "--history-ui-test") return HistoryVerification.Run(root);
             if (mode == "--self-test" || mode == "--lifecycle-test") return SelfTest(root, mode);
@@ -259,7 +314,11 @@ namespace CodexQuotaDesktop
                     return 0;
                 }
                 TrayApplication app = null;
-                try { app = new TrayApplication(root, mode == "--autostart", true); Application.Run(app); }
+                try {
+                    bool firstRun = PortableConfiguration.EnsureLocalConfig(root, PortableConfiguration.PreferredBrowserChannel());
+                    Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
+                    app = new TrayApplication(root, mode == "--autostart", true, !firstRun); Application.Run(app);
+                }
                 finally { if (app != null) app.Quit(); mutex.ReleaseMutex(); }
             }
             return 0;

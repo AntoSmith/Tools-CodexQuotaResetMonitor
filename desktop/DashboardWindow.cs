@@ -121,5 +121,11 @@ namespace CodexQuotaDesktop
             LatestButton.Enabled = state.LastAlert != null;
             latest.Text = state.LastAlert == null ? "本次尚无新线索" : state.LastAlert.Title + "  ·  @" + state.LastAlert.Username;
         }
+        public void ShowSetupHint()
+        {
+            heading.Text = "首次使用：请先完成配置和登录";
+            description.Name = "portableSetupDescription";
+            description.Text = "已创建本地配置。请打开配置核对账号，运行 LoginX.cmd 登录后，再启动监控。";
+        }
     }
 }

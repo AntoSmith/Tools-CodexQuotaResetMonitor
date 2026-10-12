@@ -5,7 +5,12 @@ $fixtureRoot = Join-Path $root 'data/desktop'
 $fixture = Join-Path $fixtureRoot ('history-bridge-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $fixture 'data/desktop') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'quota_monitor') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $root 'data/desktop/python-path.txt') -Destination (Join-Path $fixture 'data/desktop/python-path.txt')
+$bundledPython = Join-Path $root 'runtime/python/python.exe'
+if (Test-Path -LiteralPath $bundledPython -PathType Leaf) {
+    [IO.File]::WriteAllText((Join-Path $fixture 'data/desktop/python-path.txt'), $bundledPython, [Text.UTF8Encoding]::new($false))
+} else {
+    Copy-Item -LiteralPath (Join-Path $root 'data/desktop/python-path.txt') -Destination (Join-Path $fixture 'data/desktop/python-path.txt')
+}
 Get-ChildItem -LiteralPath (Join-Path $root 'quota_monitor') -Filter '*.py' | Copy-Item -Destination (Join-Path $fixture 'quota_monitor')
 $utf8 = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $fixture 'config.browser.local.toml'), "[monitor]`ndatabase=`"data/history.db`"`n", $utf8)

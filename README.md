@@ -9,6 +9,7 @@
 <p align="center"><strong>Windows 后台运行</strong> · 默认每 30 分钟检查 · 无需 X API Key</p>
 
 <p align="center">
+  <a href="https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest">下载 Windows 便携版</a> ·
   <a href="#界面一览">界面一览</a> · <a href="#快速开始">快速开始</a> ·
   <a href="docs/USAGE.md">使用说明</a> · <a href="config.browser.example.toml">配置模板</a>
 </p>
@@ -70,6 +71,19 @@ flowchart LR
 
 ## 快速开始
 
+### 下载运行
+
+**Windows 10/11 x64，无需自行安装 Python、Node.js 或 npm。**
+
+1. 从 [GitHub Releases](https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest) 下载 `windows-x64.zip`，完整解压到可写目录。
+2. 双击 `CodexQuotaMonitor.exe`。首次启动从模板创建本机配置，并显示设置提示。
+3. 在 **打开配置** 中核对监控账号、填写自己的邮件参数，配置后点击 **启动监控**。
+
+便携版包含运行依赖，使用本机已有的 Chrome 或 Edge；解压后请保留整个文件夹。下载包只带模板，运行产生的配置、名单与数据保存在使用者本机。
+
+<details>
+<summary><strong>开发者：从源码构建</strong></summary>
+
 **准备环境：** Windows · Python 3.11+ · Node.js/npm · Chrome 或 Edge
 
 ```powershell
@@ -84,6 +98,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 2. 双击 `CodexQuotaMonitor.exe`，在 **设置** 中管理订阅与自启动。
 3. 在 **历史线索** 中回看记录；关闭主窗口收回托盘，托盘“退出”停止监控。
 
+便携包构建：`python scripts/build-portable.py --version 0.2.0`。下载来源、校验与许可证见包内 `runtime-provenance.json` 和 `THIRD_PARTY_NOTICES.txt`。
+
+</details>
+
 [首次使用与 X 登录](docs/USAGE.md#首次使用) · [订阅管理](docs/USAGE.md#本地订阅管理) · [邮件测试](docs/USAGE.md#测试选中的收件邮箱) · [历史标记](docs/USAGE.md#历史线索与人工标记)
 
 ## 使用与隐私
@@ -92,7 +110,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 | --- | --- |
 | 消息的含义 | 非官方候选线索，需结合原帖和账户状态判断；不提供充值或代重置。 |
 | 运行条件 | 本机需联网且保持唤醒；页面限制和来源延迟会影响覆盖与及时性。 |
-| 程序依赖 | EXE 是桌面启动器，需保留源码、配置及运行依赖。 |
+| 程序依赖 | 下载版自带 Python、Node.js 与 Playwright；源码版需准备依赖。两者都需保留完整文件夹。 |
 | 私人数据 | 仓库只含配置模板；个人配置、收件名单、数据库、日志及浏览器会话留在本地。 |
 
 [完整使用与排查](docs/USAGE.md) · [发布与隐私检查](docs/PUBLISH.md)

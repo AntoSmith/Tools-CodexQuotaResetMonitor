@@ -55,16 +55,21 @@ def emit_event(event_type, **fields):
 
 def browser_runtime(config):
     b = config.section('browser')
-    node = shutil.which('node')
+    app_root = Path(__file__).resolve().parent.parent
+    portable_node = app_root / 'runtime' / 'node' / 'node.exe'
+    node = str(portable_node) if portable_node.is_file() else shutil.which('node')
     if not node:
         raise ConfigError('浏览器模式需要 Node.js 和 Playwright，请查看 README')
     env = os.environ.copy()
     for key in ('X_BEARER_TOKEN', 'QQ_SMTP_AUTH_CODE'):
         env.pop(key, None)
     bundled = Path.home() / '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'
+    app_modules = app_root / 'node_modules'
     modules = b.get('node_modules')
     if modules:
         env['NODE_PATH'] = str(config.base / modules)
+    elif app_modules.is_dir():
+        env['NODE_PATH'] = str(app_modules)
     elif bundled.exists():
         env['NODE_PATH'] = os.pathsep.join(filter(None, [env.get('NODE_PATH'), str(bundled)]))
     return node, env

@@ -25,7 +25,8 @@ namespace CodexQuotaDesktop
                 string fixture = Path.Combine(output, "settings-fixture-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(Path.Combine(fixture, "data", "desktop"));
                 Directory.CreateDirectory(Path.Combine(fixture, "quota_monitor"));
-                File.Copy(Path.Combine(output, "python-path.txt"), Path.Combine(fixture, "data", "desktop", "python-path.txt"));
+                using (MonitorProcess runtime = new MonitorProcess(root))
+                    File.WriteAllText(Path.Combine(fixture, "data", "desktop", "python-path.txt"), runtime.Runtime("python"), new System.Text.UTF8Encoding(false));
                 foreach (string file in Directory.GetFiles(Path.Combine(root, "quota_monitor"), "*.py"))
                     File.Copy(file, Path.Combine(fixture, "quota_monitor", Path.GetFileName(file)));
                 string fixtureConfig = "[notifications]\nchannel=\"smtp\"\nto=\"old@example.com\"\n";

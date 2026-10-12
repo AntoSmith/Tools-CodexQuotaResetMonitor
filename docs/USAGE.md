@@ -4,9 +4,23 @@
 
 当前使用浏览器采集，唯一需要编辑的配置是 `config.browser.local.toml`。不需要 X_BEARER_TOKEN 或付费 API 预算。捕捉到的内容是候选线索，不保证适用于你的订阅。
 
+## 下载便携版
+
+从 [GitHub Releases](https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest) 下载 Windows x64 ZIP，完整解压到自己可写的目录，例如桌面或文档目录，再双击 `CodexQuotaMonitor.exe`。不要直接在 ZIP 内运行，也不要只复制 EXE。
+
+便携版内置 Python、Node.js 和 Playwright，不用自己安装或配置 PATH；支持 Windows 10/11 x64，仍需本机有 Chrome 或 Edge。.NET Framework 桌面运行环境通常由 Windows 提供。
+
+首次启动只从 `config.browser.example.toml` 生成全新的 `config.browser.local.toml`，打开配置提示并保持监控停止。核对需要监控的公开账号，把对应 `verified` 改为 `true`；需要邮件时填写自己的 SMTP 参数，切换 `channel` 为 `smtp`。设置完成后点击“启动监控”。默认优先使用 Chrome，未安装 Chrome 且存在 Edge 时，初始配置选择 Edge。
+
+运行后的收件人设置、日志、数据库和独立浏览器配置由程序在本机创建。发布 ZIP 不包含作者的私人配置或历史数据。搬移便携文件夹时要移动完整目录；已经启用自启动的使用者，搬移后在设置里修复启动项。
+
+需要使用下文命令行入口时，便携版把开头的 `python` 换为 `.\runtime\python\python.exe`，在便携包根目录执行即可；Node.js 和 Playwright 由程序从包内定位。`scripts/run.ps1` 与 `LoginX.cmd` 同样会优先使用包内运行时。
+
+包内 `runtime-provenance.json` 记录运行时版本、来源与校验，`THIRD_PARTY_NOTICES.txt` 和各依赖的许可证随包保留。Releases 附带 `SHA256SUMS.txt`，可以用 `Get-FileHash .\\CodexQuotaMonitor-v0.2.0-windows-x64.zip -Algorithm SHA256` 对照校验。
+
 ## 首次使用
 
-需要 Python 3.11+、Node.js/npm，以及本机安装的 Chrome 或 Edge。Windows 桌面启动器使用 .NET Framework；后台隐藏浏览器功能仅适用于 Windows。
+下面是源码版的准备步骤；已下载便携版可以跳过依赖安装。源码版需要 Python 3.11+、Node.js/npm，以及本机安装的 Chrome 或 Edge。Windows 桌面启动器使用 .NET Framework；后台隐藏浏览器功能仅适用于 Windows。
 
 在项目目录执行：
 

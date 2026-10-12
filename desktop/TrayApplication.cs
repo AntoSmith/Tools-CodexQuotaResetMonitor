@@ -16,12 +16,14 @@ namespace CodexQuotaDesktop
         readonly ToolStripMenuItem startupItem, startItem, stopItem;
         readonly Timer timer;
         readonly string root;
-        bool closing;
+        bool closing, setupPending;
         AlertWindow popup;
         HistoryWindow historyWindow;
         readonly IHistoryRepository history;
-        public TrayApplication(string root, bool hidden, bool launch)
+        public TrayApplication(string root, bool hidden, bool launch) : this(root, hidden, launch, true) { }
+        public TrayApplication(string root, bool hidden, bool launch, bool startMonitoring)
         {
+            setupPending = !startMonitoring;
             this.root = root; monitor = new MonitorProcess(root); window = new DashboardWindow(); history = new HistoryClient(root);
             window.StartButton.Click += delegate { StartMonitor(); };
             window.StopButton.Click += delegate { StopMonitor(); };
@@ -55,7 +57,7 @@ namespace CodexQuotaDesktop
             };
             timer = new Timer { Interval = 500 }; timer.Tick += delegate { Tick(); };
             Refresh();
-            if (launch) { timer.Start(); StartMonitor(); if (!hidden) ShowWindow(); }
+            if (launch) { timer.Start(); if (startMonitoring) StartMonitor(); if (!hidden || setupPending) ShowWindow(); }
             else window.CreateControl();
         }
         void Tick()
@@ -73,12 +75,14 @@ namespace CodexQuotaDesktop
         void Refresh()
         {
             window.RefreshState(state); startItem.Enabled = !state.Active; stopItem.Enabled = state.Active;
+            if (setupPending && !state.Active) window.ShowSetupHint();
             tray.Text = AppBrand.Name + (state.Active ? (state.Phase == "collecting" ? "：正在采集" : "：运行中") : "：已停止");
         }
         void ShowWindow() { window.Show(); window.WindowState = FormWindowState.Normal; window.Activate(); }
         void StartMonitor()
         {
             if (state.Active) return;
+            setupPending = false;
             try { monitor.Start(MonitorProcess.MonitorCode); state.Started(); Program.LaunchLog(root, "monitor_started"); }
             catch (Exception ex) {
                 Program.LaunchLog(root, "monitor_start_failed " + ex.GetType().Name);
