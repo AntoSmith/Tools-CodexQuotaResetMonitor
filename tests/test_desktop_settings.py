@@ -96,7 +96,7 @@ class DesktopSettingsTests(unittest.TestCase):
         contacts = read_settings(self.path)['contacts']
         self.assertEqual(contacts, contacts_with_defaults([{'name': '', 'email': 'a@example.com'}, {'name': '', 'email': 'b@example.com'}]))
         save_settings(self.path, contacts)
-        self.assertEqual(json.loads(p.read_text(encoding='utf-8'))['version'], 3)
+        self.assertEqual(json.loads(p.read_text(encoding='utf-8'))['version'], 4)
 
     def test_duplicate_email_names_are_unambiguous_and_invalid_rows_do_not_save(self):
         from quota_monitor.desktop_settings import save_settings
@@ -112,6 +112,37 @@ class DesktopSettingsTests(unittest.TestCase):
         for contacts in invalid:
             with self.subTest(contacts=contacts), self.assertRaises(ConfigError): save_settings(self.path, contacts)
             self.assertEqual(Config.load(self.path).section('notifications')['recipient_names'], {'a@example.com': '主邮箱'})
+
+    def test_contacts_remain_readable_when_transport_or_collection_needs_repair(self):
+        from quota_monitor.desktop_settings import read_settings, save_settings, settings_path
+        contacts = [{'name': '已有名单', 'email': 'existing@example.com', 'enabled': False}]
+        save_settings(self.path, contacts)
+        path = settings_path(self.path)
+        original = json.loads(path.read_text(encoding='utf-8'))
+        for key, malformed in [('transport', {'channel': 'smtp', 'host': 'bad\n'}),
+                               ('collection', {'browser_channel': 'other', 'accounts': []})]:
+            with self.subTest(section=key):
+                path.write_text(json.dumps({**original, key: malformed}), encoding='utf-8')
+                with self.assertRaises(ConfigError): Config.load(self.path)
+                visible = read_settings(self.path)
+                self.assertEqual(visible['contacts'], contacts_with_defaults(contacts))
+                self.assertEqual(visible['recipients'], 'existing@example.com')
+                self.assertEqual(visible['channel'], 'smtp')
+                self.assertNotIn('secret-test-only', json.dumps(visible))
+                save_settings(self.path, visible['contacts'] + [{'name': '新增', 'email': 'new@example.com'}])
+                self.assertEqual([c['email'] for c in read_settings(self.path)['contacts']],
+                                 ['existing@example.com', 'new@example.com'])
+                with self.assertRaises(ConfigError): Config.load(self.path)
+
+    def test_invalid_recipient_section_is_not_silently_read_as_an_empty_list(self):
+        from quota_monitor.desktop_settings import read_settings, save_settings, settings_path
+        save_settings(self.path, [{'name': '已有名单', 'email': 'existing@example.com'}])
+        path = settings_path(self.path)
+        for document in ({'version': 4, 'contacts': [{'name': 'bad', 'email': 'invalid'}]},
+                         {'version': 4, 'contacts': None}, {'version': 4}, '{broken'):
+            with self.subTest(document=document):
+                path.write_text(document if isinstance(document, str) else json.dumps(document), encoding='utf-8')
+                with self.assertRaises(ConfigError): read_settings(self.path)
 
 
 if __name__ == '__main__': unittest.main()

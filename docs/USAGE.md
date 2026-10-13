@@ -2,7 +2,7 @@
 
 [返回项目首页](../README.md) · [首次使用](#首次使用) · [Windows 桌面启动器](#windows-桌面启动器) · [订阅管理](#本地订阅管理) · [邮件测试](#测试选中的收件邮箱) · [源码发布](PUBLISH.md)
 
-当前使用浏览器采集，唯一需要编辑的配置是 `config.browser.local.toml`。不需要 X_BEARER_TOKEN 或付费 API 预算。捕捉到的内容是候选线索，不保证适用于你的订阅。
+当前使用浏览器采集。日常配置可在桌面“设置”完成，无需编辑文件；高级选项仍保留在 `config.browser.local.toml`。不需要 X_BEARER_TOKEN 或付费 API 预算。捕捉到的内容是候选线索，不保证适用于你的订阅。
 
 ## 下载便携版
 
@@ -10,13 +10,22 @@
 
 便携版内置 Python、Node.js 和 Playwright，不用自己安装或配置 PATH；支持 Windows 10/11 x64，仍需本机有 Chrome 或 Edge。.NET Framework 桌面运行环境通常由 Windows 提供。
 
-首次启动只从 `config.browser.example.toml` 生成全新的 `config.browser.local.toml`，打开配置提示并保持监控停止。核对需要监控的公开账号，把对应 `verified` 改为 `true`；需要邮件时填写自己的 SMTP 参数，切换 `channel` 为 `smtp`。设置完成后点击“启动监控”。默认优先使用 Chrome，未安装 Chrome 且存在 Edge 时，初始配置选择 Edge。
+首次启动从模板生成本机配置并自动打开设置，监控保持停止。完成以下步骤后回到主窗口点击“启动监控”；未完成就关闭应用时，下次打开可继续配置。
+
+| 设置页 | 操作 |
+| --- | --- |
+| 邮件发送 | 选择“邮件提醒”，填写发件邮箱和 SMTP 授权码，点击保存。QQ 邮箱自动填入服务器和 SSL 端口；其他邮箱选择自定义 SMTP。 |
+| 采集设置 | 选择已安装的 Chrome 或 Edge，核对并勾选公开监控账号，点击保存。无需先登录 X。 |
+| 订阅管理 | 添加收件邮箱、姓名和偏好，保存后选中联系人发送初始测试邮件。 |
+| 启动设置 | 可选登录 Windows 后自动启动。 |
+
+授权码默认遮挡，重新打开设置不显示已保存内容；留空保留原值，填写新值替换，勾选清除可移除本机保存值（环境变量设置仍有效）。保存邮件或采集设置会重新加载正在运行的监控；原来停止时保持停止。原始 TOML 保留，本机界面设置优先，存储于 `data/desktop`，不要公开上传。
 
 运行后的收件人设置、日志、数据库和独立浏览器配置由程序在本机创建。发布 ZIP 不包含作者的私人配置或历史数据。搬移便携文件夹时要移动完整目录；已经启用自启动的使用者，搬移后在设置里修复启动项。
 
 需要使用下文命令行入口时，便携版把开头的 `python` 换为 `.\runtime\python\python.exe`，在便携包根目录执行即可；Node.js 和 Playwright 由程序从包内定位。`scripts/run.ps1` 与 `LoginX.cmd` 同样会优先使用包内运行时。
 
-包内 `runtime-provenance.json` 记录运行时版本、来源与校验，`THIRD_PARTY_NOTICES.txt` 和各依赖的许可证随包保留。Releases 附带 `SHA256SUMS.txt`，可以用 `Get-FileHash .\\CodexQuotaMonitor-v0.2.0-windows-x64.zip -Algorithm SHA256` 对照校验。
+包内 `runtime-provenance.json` 记录运行时版本、来源与校验，`THIRD_PARTY_NOTICES.txt` 和各依赖的许可证随包保留。便携包附带 `SHA256SUMS.txt`，可以用 `Get-FileHash .\\CodexQuotaMonitor-v0.2.1-windows-x64.zip -Algorithm SHA256` 对照校验。
 
 ## 首次使用
 
@@ -31,7 +40,7 @@ npm install
 
 编辑 `config.browser.local.toml`：核对需要监控的公开账号后把其 `verified` 改为 `true`，不需要的账号段可以删除。模板默认 `channel = "console"`，只输出日志；需要邮件时按下文填写真实邮箱和授权码，保留原数据库路径即可。真实配置不要写入 example 模板。
 
-首次登录 X：先在监控窗口点击“停止监控”，再双击项目目录的 `LoginX.cmd`。在打开的专用浏览器中手动登录，确认能打开账号的 Replies，然后关闭全部专用浏览器窗口，回到监控程序点击“启动监控”。以后后台复用同一个 `browser.profile` 保存的会话，失效后重新执行此步骤。日常 Chrome 中已经登录，不代表这个独立配置也已登录；不要更换或清理 profile 目录。登录入口本身不读取帖子、不创建通知，不验证密码或登录是否成功。
+可选登录 X：需要读取受登录限制的页面时，先停止监控，再双击 `LoginX.cmd`。手动登录专用浏览器并确认能打开 Replies，然后关窗并重新启动监控。后台复用独立浏览器的会话，日常 Chrome 中已登录不代表专用浏览器也已登录。登录入口本身不读取帖子或发送通知。
 
 先运行 `python -m quota_monitor browser-once` 检查采集，再按下文构建 EXE 或执行 `python -m quota_monitor browser-run`。Python 核心使用标准库，无需安装额外 Python 依赖；仅重新生成 Logo 时需要 Pillow。
 
@@ -45,7 +54,7 @@ npm install
 
 项目专属 Logo 使用青绿色重置环与白色代码括号，统一用于窗口、托盘和 EXE。矢量源图为 `assets/quota-monitor.svg`，多尺寸 Windows 图标为 `assets/quota-monitor.ico`；图标已嵌入 EXE。若需重新生成素材，可运行 `python scripts/generate-logo.py`（仅生成素材时需要 Pillow）。
 
-双击项目目录中的 `CodexQuotaMonitor.exe` 即开始监控，无需手动输入 Python 命令。右下角托盘图标可查看状态、启动/停止监控、打开配置与日志，或切换“登录 Windows 自动启动”。关闭状态窗口会收回托盘；右键托盘选择“退出”才会停止程序及它启动的采集进程。
+双击项目目录中的 `CodexQuotaMonitor.exe` 即可打开应用，无需手动输入 Python 命令。首次使用先完成界面设置再启动监控；已配置的应用启动后继续监控。右下角托盘图标可查看状态、启动/停止监控、打开设置与日志，或切换“登录 Windows 自动启动”。关闭状态窗口会收回托盘；右键托盘选择“退出”才会停止程序及它启动的采集进程。
 
 启动按钮会保持深色“监控中”，直到停止或进程退出。窗口区分准备采集、正在采集和等待下一轮：浏览器完成一轮后关闭，监控继续等待，并显示倒计时。本次启动的已结束轮数包含失败和空结果，另行显示失败/空结果数量；开始/结束时间按本机时区显示。重新启动监控后轮数归零，中途停止的轮次标为中断，不算已结束。
 
@@ -61,7 +70,7 @@ npm install
 
 修改配置后，先停止监控，再启动以加载新配置。需要执行 `test-email` 时也先从托盘停止监控。请勿同时另开 `browser-run`；程序会拒绝占用同一数据库的第二个监控进程。
 
-这是本机启动器，需要与 `quota_monitor`、`scripts`、配置和 `data/desktop` 保持在同一个项目目录，并依赖本机 Python、Node.js、Playwright 和 Chrome。不能只复制 EXE 到另一台电脑使用。邮箱授权码仍保存在本地配置中，没有编进 EXE。移动整个项目之前，先取消自启动，移动后重新构建并启用自启动。
+便携版内置 Python、Node.js 和 Playwright；源码构建使用本机运行环境。两种版本都需要本机已安装 Chrome 或 Edge，并保留整个应用目录，不能只复制 EXE。邮箱授权码保存在本机设置或原有配置中，没有编进 EXE。更换应用目录后请在设置中修复自启动项。
 
 修改启动器源码或更换 Python/Node 路径后，先退出托盘程序，再重新构建：
 
@@ -76,6 +85,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/test-desktop-feedback.
 `test-desktop.ps1` 包含 `--ui-test`，验证按钮、进程会话隔离及退出时最后的状态消息，并将实际窗口截图写到 `data/desktop/dashboard-preview.png`、`data/desktop/alert-preview.png`。采集生命周期使用 `@quota-ui` JSON 事件同步界面；普通控制台通知写入 stderr，仍记录在桌面日志里。
 
 ## 浏览器实验模式（无需付费 X API）
+
+### divin.cc 事件补充
+
+默认启用 `browser.divin_feed_enabled = true`，读取 [公开事件接口](https://divin.cc/api/reset-events) 与 [公开原文索引](https://divin.cc/api/reset-feed)。事件类型、覆盖范围、重置原因和判断依据按 X 原帖 ID 关联；合并公告的参考链接保留在“第三方证据链接”中。新鲜候选与原有索引共用 `max_posts` 详情预算，浏览器继续核对作者正文和可读上文。
+
+新邮件、新线索弹窗与历史详情显示独立的第三方补充区。历史补充保存在 SQLite 的 `source_assessments` 表；以后抓到的新说明可以补充已有历史记录，不改变已发送邮件、自动分类、人工标记，也不触发补发。没有对应本地线索的历史事件只保留补充信息，不作为本工具已捕获的提醒。
+
+“重置原因”保留事件表解释；“判断依据”保留该站对类型、阶段、范围和上下文的分析，两者含义不同。原因待确认、站点人工更正及字段冲突会保留说明。第三方信号强度和 `confirmedReset` 不等于本地账户已经重置，也不参与本工具自动分类。接口 `generatedAt` 是响应生成时间，不能证明上游刚完成扫描。站点接口失败时记录状态并继续其他来源；每个接口超时最多 8 秒，本地至少缓存 60 秒并遵守 429 退避。
+
+第三方上下文仅使用链接定位，再读取 X 中完整的作者正文；镜像译文、网站原因及类型不会替代 X 原文。链接关系仍是候选，不能据此宣称已核实直接回复关系。设置 `divin_feed_enabled = false` 可关闭这一路来源。`browser-login` 和最新主页帖邮件测试不会调用它。
 
 浏览器模式读取公开页面，不保证覆盖完整。网站可能限制无头浏览器或未登录访问，因此默认使用完整浏览器；是否能够读取须在自己的网络和浏览器环境中验证。
 
@@ -223,9 +242,9 @@ python -m quota_monitor.signal_email --send-to-self
 
 保存时会先停止正在运行的监控，保存名单并更新已有待发队列，成功后恢复监控；当前采集轮次会中断。原本停止的监控保持停止。停机期间保存的停用或过滤操作也会取消对应旧邮件，再次启用不会恢复它们。若队列更新失败，会明确提示并保持停止，请重新保存成功后再启动。保存名单不会改变自启动选项，也不会自动发送欢迎邮件。到期停发不需要一直打开设置窗口，由后台发送逻辑检查。
 
-名单与订阅规则保存在 `data/desktop/config.browser.local.toml.notifications.json`，此目录已排除上传。v3 格式保存 `contacts`，每项包括 `name`、`email`、`enabled`、`accept_uncertain`、`start_at`、`end_at`、`delivery_mode`。读取时派生 `notifications.to` 和 `notifications.recipient_names`，完整规则提供给后台投递逻辑；无需手工维护第二份名单。兼容旧版 v1 分号字符串和 v2 名称/邮箱列表。
+本机设置保存在 `data/desktop/config.browser.local.toml.notifications.json`，此目录已排除上传。v4 格式分别保存联系人与订阅规则 `contacts`、邮件发送 `transport` 和采集设置 `collection`；保存任一部分保留其他部分，后台与界面共用。兼容 v1 分号字符串、v2 名称/邮箱列表及 v3 订阅设置，无需手工维护第二份名单。
 
-桌面和使用同一配置文件的命令行读取同一份本机名单；其他配置文件使用各自的名单。发件邮箱、授权码和 `channel` 仍沿用 TOML。`console` 模式只输出日志；在界面填写邮箱不会自动切换到 SMTP。
+桌面和使用同一配置文件的命令行读取同一份本机设置，其他配置文件使用各自的设置。界面保存的邮件发送参数优先；尚未保存时沿用原 TOML 和环境变量。只添加收件人不会开启邮件发送，需要在“邮件发送”页选择“邮件提醒”并保存；“仅记录日志”不发送日常提醒。
 
 此面板由本机操作者管理，没有用户自助账号、支付或续费网站。采集仍按当前配置运行，本次不提供采集频率控件。
 
@@ -249,7 +268,7 @@ QQ_SMTP_AUTH_CODE = ""
 
 `test-email` 会向全部配置的收件邮箱发送初始测试邮件；只要任一邮箱失败，整体报告就不是“全部接受”。该测试入口不自动重试；手动再次执行会重新发送给所有目标邮箱。
 
-`notifications.channel = "console"` 时仅打印到终端。要发邮件，需要将其改为 `smtp`，填写 host、port、username、to，并在同一 notifications 段填写 `QQ_SMTP_AUTH_CODE = "你的授权码"`（QQ SMTP 授权码，不是登录密码）。配置值优先；留空时读取同名环境变量。`config.browser.local.toml` 已被 .gitignore 排除，不要公开分享填好授权码的配置。切换通道后重启监控，无需更换 monitor.database。
+“仅记录日志”不发送日常邮件。桌面使用者在“邮件发送”页填写发件邮箱、SMTP 授权码及服务器并保存，在“订阅管理”中设置目标邮箱即可。命令行使用者也可填写 TOML 的 `notifications` 段，授权码不是邮箱登录密码。界面配置优先，未保存时沿用 TOML；空授权码可回退同名环境变量。不要公开本机设置或含授权码的配置文件。切换通道无需更换数据库，界面保存会重新加载正在运行的监控。
 
 默认只提醒 24 小时内、尚未处理过版本的重置预告、已重置、重置券、额度变化、更正或待核实线索。无关内容和普通周期恢复不提醒。发送队列会重试失败项；SMTP 接受不等于邮件一定进入收件箱。当前提前提醒关闭（reminder_minutes=0）。
 

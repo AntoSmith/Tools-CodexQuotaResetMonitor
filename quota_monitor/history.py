@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import Config
+from .source_notes import with_assessment
 
 
 LABELS = ('unreviewed', 'confirmed', 'ambiguous', 'uncertain')
@@ -101,10 +102,14 @@ def _query(db):
              "ELSE 'unreviewed' END") if has_reviews else "'unreviewed'"
     reviewed = 'r.reviewed_at' if has_reviews else 'NULL'
     kind, raw = ('p.kind', 'p.raw') if has_posts else ("''", "''")
+    has_assessments = {'post_id', 'provider', 'metadata'} <= _columns(db, 'source_assessments')
+    assessments = ("LEFT JOIN source_assessments a ON a.post_id=history_post_id(o.event_key) "
+                   "AND a.provider='divin.cc'") if has_assessments else ''
+    assessment = 'a.metadata' if has_assessments else "''"
     return f'''SELECT o.rowid AS ordinal, o.event_key AS id, o.title, o.body,
                       {created} AS detected, {kind} AS kind, {raw} AS raw,
-                      {label} AS label, {reviewed} AS reviewed
-               FROM outbox o {posts} {reviews} WHERE history_is_post(o.event_key)'''
+                      {label} AS label, {reviewed} AS reviewed, {assessment} AS assessment
+               FROM outbox o {posts} {reviews} {assessments} WHERE history_is_post(o.event_key)'''
 
 
 def _string(value):
@@ -130,6 +135,10 @@ def _body_text(body):
 
 def _item(row):
     body = _string(row['body'])
+    try:
+        body = with_assessment(body, json.loads(row['assessment'] or '{}'))
+    except (ValueError, TypeError, RecursionError):
+        pass
     metadata = _metadata(body)
     try:
         payload = json.loads(row['raw'] or '{}')

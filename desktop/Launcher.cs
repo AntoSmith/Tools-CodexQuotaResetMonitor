@@ -207,6 +207,20 @@ namespace CodexQuotaDesktop
             return SelectBrowserChannel(BrowserInstalled(@"Google\Chrome\Application\chrome.exe"),
                 BrowserInstalled(@"Microsoft\Edge\Application\msedge.exe"));
         }
+        static string SetupMarker(string root) { return Path.Combine(root, "data", "desktop", "setup-pending"); }
+        public static bool IsSetupPending(string root) { return File.Exists(SetupMarker(root)); }
+        public static void MarkSetupPending(string root)
+        {
+            string marker = SetupMarker(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(marker));
+            File.WriteAllText(marker, "Save mail, recipients and collection settings in the app before starting monitoring.", new UTF8Encoding(false));
+        }
+        public static void CompleteSetup(string root)
+        {
+            try { File.Delete(SetupMarker(root)); }
+            catch (IOException) { throw new InvalidOperationException("无法完成首次设置，请重试保存后再启动监控。"); }
+            catch (UnauthorizedAccessException) { throw new InvalidOperationException("无法完成首次设置，请重试保存后再启动监控。"); }
+        }
         public static bool EnsureLocalConfig(string root, string preferredBrowserChannel)
         {
             string config = Path.Combine(root, "config.browser.local.toml");
@@ -317,7 +331,8 @@ namespace CodexQuotaDesktop
                 try {
                     bool firstRun = PortableConfiguration.EnsureLocalConfig(root, PortableConfiguration.PreferredBrowserChannel());
                     Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
-                    app = new TrayApplication(root, mode == "--autostart", true, !firstRun); Application.Run(app);
+                    if (firstRun) PortableConfiguration.MarkSetupPending(root);
+                    app = new TrayApplication(root, mode == "--autostart", true, !PortableConfiguration.IsSetupPending(root)); Application.Run(app);
                 }
                 finally { if (app != null) app.Quit(); mutex.ReleaseMutex(); }
             }

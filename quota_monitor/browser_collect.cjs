@@ -53,11 +53,35 @@ async function main(options, browserType = chromium) {
       let challenged = false;
       const contextEnabled = !options.profile_only && options.context_enabled !== false;
       const profile = `https://x.com/${account.username}`;
-      const seeds = !options.profile_only && account.username.toLowerCase() === 'thsottiaux' && options.reset_feed?.status === 'ok'
-        ? (options.reset_feed.candidates || []).filter(p => p.username === 'thsottiaux' && /^[0-9]{1,25}$/.test(p.id)
-          && p.url === `https://x.com/thsottiaux/status/${p.id}`).slice(0,options.max_posts) : [];
+      const lists = [
+        [options.divin_feed, 'https://divin.cc/'],
+        [options.reset_feed, 'https://codex-reset.com/']
+      ].map(([feed,source]) => !options.profile_only && feed?.status === 'ok'
+        && (source !== 'https://codex-reset.com/' || account.username.toLowerCase() === 'thsottiaux')
+        ? (Array.isArray(feed.candidates) ? feed.candidates : []).filter(p =>
+          typeof p.username === 'string' && p.username.toLowerCase() === account.username.toLowerCase()
+          && /^[A-Za-z0-9_]{1,15}$/.test(p.username) && /^[0-9]{1,25}$/.test(p.id)
+          && p.url === `https://x.com/${p.username}/status/${p.id}`)
+          .slice(0, options.max_posts).map(p=>({...p, discovery_source:source, feed_fetched_at:feed.fetched_at})) : []);
+      // Share the fixed detail budget between providers and deduplicate by X ID.
+      const seedMap = new Map();
+      for (let i=0; i<Math.max(...lists.map(list=>list.length)); i++) {
+        for (const list of lists) {
+          const seed = list[i]; if (!seed) continue;
+          const previous = seedMap.get(seed.id);
+          if (!previous) seedMap.set(seed.id, seed);
+          else if (previous.parent_id && seed.parent_id &&
+            (previous.parent_id !== seed.parent_id || previous.parent_username?.toLowerCase() !== seed.parent_username?.toLowerCase())) {
+            delete previous.parent_id; delete previous.parent_username; previous.parent_conflict = true;
+          } else if (!previous.parent_id && !previous.parent_conflict && seed.parent_id) {
+            previous.parent_id=seed.parent_id; previous.parent_username=seed.parent_username;
+            previous.parent_source=seed.discovery_source;
+          }
+        }
+      }
+      const seeds = [...seedMap.values()].slice(0,options.max_posts);
       for (const seed of seeds) discovered.set(seed.id, seed);
-      report.discovery_source = seeds.length ? 'https://codex-reset.com/' : 'x_public_pages';
+      report.discovery_source = seeds.length ? seeds[0].discovery_source : 'x_public_pages';
       const urls = options.profile_only ? [profile] : [...(seeds.length ? [] : [profile + '/with_replies', profile]),
         ...(contextEnabled ? options.conversation_urls || [] : [])];
       const watched = new Set(contextEnabled ? options.conversation_urls || [] : []);
@@ -112,8 +136,8 @@ async function main(options, browserType = chromium) {
           const accepted = {...post, context:contextEnabled ? post.context || [] : []};
           const seed = seeds.find(s=>s.id===candidate.id);
           if (seed) {
-            accepted.discovery_source = 'https://codex-reset.com/';
-            accepted.feed_fetched_at = options.reset_feed.fetched_at;
+            accepted.discovery_source = seed.parent_source || seed.discovery_source;
+            accepted.feed_fetched_at = seed.feed_fetched_at;
             accepted.context_status = !contextEnabled ? 'disabled' : accepted.context.length ? 'detail_context' : 'not_available';
             if (contextEnabled && /^[0-9]{1,25}$/.test(seed.parent_id || '')
               && BigInt(seed.parent_id) < BigInt(post.id) && /^[A-Za-z0-9_]{1,15}$/.test(seed.parent_username || '')) {
@@ -131,7 +155,7 @@ async function main(options, browserType = chromium) {
                     const original = parent.posts.find(matches);
                     if (original) {
                       accepted.context = [{...original, relation:'parent_reported_by_feed',
-                        evidence:'codex_reset_parent_link', reply_id:post.id,
+                        evidence:accepted.discovery_source === 'https://divin.cc/' ? 'divin_context_link' : 'codex_reset_parent_link', reply_id:post.id,
                         url:`https://x.com/${seed.parent_username}/status/${seed.parent_id}`}];
                       accepted.context_status = 'parent_fetched';
                     }

@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -13,6 +15,32 @@ namespace CodexQuotaDesktop
         const string Template = "# synthetic fixture only\n[browser]\nchannel = \"chrome\" # browser\nprofile = \"data/browser/profile\"\n[notifications]\nchannel = \"console\"\nusername = \"sender@example.com\"\n";
         static void Check(bool value, string message) { if (!value) throw new Exception(message); }
         static void Stub(string path) { Directory.CreateDirectory(Path.GetDirectoryName(path)); File.WriteAllText(path, "synthetic, never executed"); }
+        static void BuildSettingsRuntime(string root)
+        {
+            // GUI setup invokes its runtime. Use a valid PE which only responds to read commands.
+            string read = "{\"ok\":true,\"contacts\":[],\"recipients\":\"\",\"channel\":\"console\",\"count\":0}";
+            string setup = "{\"ok\":true,\"transport\":{\"channel\":\"console\",\"host\":\"smtp.qq.com\",\"port\":465,\"username\":\"\",\"auth_code_present\":false,\"auth_code_source\":\"none\"},\"collection\":{\"browser_channel\":\"chrome\",\"accounts\":[]},\"source\":\"synthetic fixture\",\"repair_needed\":false,\"ready\":false,\"missing_steps\":[\"邮件设置\",\"监控账号\",\"订阅者\"]}";
+            string source = "using System; using System.Text; internal static class FixtureRuntime { static int Main(string[] args) { "
+                + "Console.OutputEncoding = new UTF8Encoding(false); if (args.Length != 3 || args[0] != \"-m\" || args[1] != \"quota_monitor.desktop_settings\") return 7; "
+                + "if (args[2] == \"read\") Console.WriteLine(\"" + read.Replace("\"", "\\\"") + "\"); "
+                + "else if (args[2] == \"read-setup\") Console.WriteLine(\"" + setup.Replace("\"", "\\\"") + "\"); else return 8; return 0; } }";
+            string sourcePath = Path.Combine(root, "data", "desktop", "FixtureRuntime.cs");
+            File.WriteAllText(sourcePath, source, new UTF8Encoding(false));
+            string compiler = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
+            string executable = Path.Combine(root, "runtime", "python", "python.exe");
+            ProcessStartInfo info = new ProcessStartInfo(compiler, "/nologo /target:exe /platform:x64 /codepage:65001 /out:\"" + executable + "\" \"" + sourcePath + "\"");
+            info.UseShellExecute = false; info.CreateNoWindow = true; info.RedirectStandardOutput = true; info.RedirectStandardError = true;
+            using (Process process = Process.Start(info)) {
+                var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit(10000)) { process.Kill(); throw new Exception("Synthetic settings runtime compilation timed out"); }
+                Check(process.ExitCode == 0, "Synthetic settings runtime compilation failed");
+                Check(stdout.Wait(2000) && stderr.Wait(2000), "Synthetic settings runtime compiler output did not complete");
+            }
+        }
+        static void Offscreen(Form form)
+        {
+            form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-16000, -16000); form.ShowInTaskbar = false;
+        }
         static object Setup(string method, params object[] args)
         {
             Type type = typeof(Program).Assembly.GetType("CodexQuotaDesktop.PortableConfiguration");
@@ -21,6 +49,30 @@ namespace CodexQuotaDesktop
             Check(call != null, "First-run configuration method is missing: " + method);
             try { return call.Invoke(null, args); }
             catch (TargetInvocationException ex) { throw ex.InnerException; }
+        }
+        static void VerifySetupDialog(DashboardState state, MonitorProcess monitor, Action open)
+        {
+            bool shown = false;
+            string failure = null;
+            DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+            using (System.Windows.Forms.Timer close = new System.Windows.Forms.Timer { Interval = 20 })
+            {
+                close.Tick += delegate {
+                    SettingsWindow settings = Application.OpenForms.OfType<SettingsWindow>().FirstOrDefault(form => form.Visible);
+                    if (settings == null) return;
+                    shown = true;
+                    TabControl tabs = settings.Controls.OfType<TabControl>().FirstOrDefault();
+                    if (tabs == null || tabs.SelectedTab.Text != "邮件发送") failure = "First-run settings must select the GUI mail sender tab";
+                    else if (settings.Bounds.Right >= 0 || settings.Bounds.Bottom >= 0 || settings.ShowInTaskbar) failure = "Diagnostic settings must remain offscreen";
+                    else if (state.Active || monitor.Running) failure = "Opening first-run settings started monitoring";
+                    close.Stop(); settings.Dispose();
+                };
+                close.Start();
+                open();
+                while (!shown && DateTime.UtcNow < deadline) { Application.DoEvents(); Thread.Sleep(10); }
+            }
+            Check(shown, "First-run launch must automatically open GUI settings");
+            Check(failure == null, failure);
         }
         public static int Run(string output)
         {
@@ -107,9 +159,27 @@ namespace CodexQuotaDesktop
                 }
                 Check(errors.All(error => error == null) && created.Count(value => value) == 1 && File.ReadAllText(config) == Template,
                     "Concurrent first run must exclusively create one complete configuration");
+                Check(!(bool)Setup("IsSetupPending", root), "Existing users must not be marked as incomplete setup");
+                byte[] configuredBytes = File.ReadAllBytes(config);
+                Setup("MarkSetupPending", root);
+                Check((bool)Setup("IsSetupPending", root), "First-run setup must stay pending after the local config exists");
+                Check(!(bool)Setup("EnsureLocalConfig", root, "chrome") && (bool)Setup("IsSetupPending", root), "Restarting an incomplete setup must retain the pending marker");
+                using (FileStream locked = new FileStream(Path.Combine(root, "data", "desktop", "setup-pending"), FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    bool blocked = false;
+                    try { Setup("CompleteSetup", root); }
+                    catch (InvalidOperationException ex) { blocked = ex.Message == "无法完成首次设置，请重试保存后再启动监控。"; }
+                    Check(blocked && (bool)Setup("IsSetupPending", root), "Unavailable setup marker must keep setup pending and report a safe error");
+                }
+                Setup("CompleteSetup", root);
+                Setup("CompleteSetup", root);
+                Check(!(bool)Setup("IsSetupPending", root) && File.ReadAllBytes(config).SequenceEqual(configuredBytes), "Completing setup must clear only its marker and preserve config bytes");
+                Setup("MarkSetupPending", root);
                 ConstructorInfo constructor = typeof(TrayApplication).GetConstructor(new Type[] { typeof(string), typeof(bool), typeof(bool), typeof(bool) });
                 Check(constructor != null, "Stopped setup launch option is missing");
-                TrayApplication app = (TrayApplication)constructor.Invoke(new object[] { root, true, true, false });
+                BuildSettingsRuntime(root);
+                DashboardWindow dashboard = new DashboardWindow(); Offscreen(dashboard);
+                TrayApplication app = new TrayApplication(root, true, true, false, dashboard, delegate(SettingsWindow settings) { Offscreen(settings); });
                 try
                 {
                     DashboardState state = (DashboardState)typeof(TrayApplication).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(app);
@@ -117,11 +187,14 @@ namespace CodexQuotaDesktop
                     DashboardWindow window = (DashboardWindow)typeof(TrayApplication).GetField("window", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(app);
                     Check(!state.Active && state.Phase == "stopped" && !monitor.Running, "First-run setup started or attempted monitoring");
                     Check(window.Visible && window.StartButton.Enabled && !window.StopButton.Enabled, "Autostart first run must show a stopped setup window");
-                    Check(window.Controls.Find("portableSetupDescription", true).Any(control => control.Text.Contains("打开配置")), "First-run setup instructions are missing");
+                    VerifySetupDialog(state, monitor, delegate { Application.DoEvents(); });
+                    Check(window.Controls.Find("portableSetupDescription", true).Any(control => control.Text.Contains("邮件发送") && control.Text.Contains("监控账号") && control.Text.Contains("浏览器") && !control.Text.Contains("LoginX")), "First-run setup instructions must explain GUI setup without requiring login");
+                    VerifySetupDialog(state, monitor, delegate { window.StartButton.PerformClick(); });
+                    Check(!state.Active && !monitor.Running, "Unsaved first-run setup must stay stopped when Start is clicked");
                     Check(!File.Exists(Path.Combine(root, "logs", "desktop-monitor.log")) && !Directory.Exists(Path.Combine(root, "data", "browser")), "First-run setup created monitoring data or logs");
                 }
                 finally { app.Quit(); }
-                File.WriteAllText(report, "PASS bundled runtime priority, development fallback, relocation with Chinese/spaces, exclusive template-only setup, existing bytes, browser selection, missing-template error and stopped setup UI", new UTF8Encoding(false));
+                File.WriteAllText(report, "PASS bundled runtime priority, development fallback, relocation with Chinese/spaces, exclusive template-only setup, existing bytes, browser selection, missing-template error, persistent pending marker, safe marker failure, offscreen automatic GUI mail setup and unsaved first-run start guard", new UTF8Encoding(false));
                 return 0;
             }
             catch (Exception ex) { File.WriteAllText(report, "FAIL " + ex, new UTF8Encoding(false)); return 1; }

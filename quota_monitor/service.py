@@ -9,6 +9,7 @@ from .conversation import context_posts, context_text, context_display
 from .notify import ConsoleNotifier, SMTPNotifier, deliver
 from .store import BudgetExceeded
 from .xapi import XClient, APIError
+from .source_notes import with_assessment
 
 UTC = timezone.utc
 BEIJING = timezone(timedelta(hours=8))
@@ -90,6 +91,12 @@ def process_post(payload, config, store, now=None):
             if payload['collection'].get('context_status') == 'parent_unavailable':
                 credit += '本次未能读取父帖正文，对话上下文缺失。\n'
             body = credit + body
+        if payload.get('collection', {}).get('discovery_source') == 'https://divin.cc/':
+            credit = '发现来源：divin.cc (https://divin.cc/)；正文读取自 X 公开页面。\n'
+            if payload['collection'].get('context_status') == 'parent_unavailable':
+                credit += '本次未能读取第三方链接所指的上文，对话上下文缺失。\n'
+            body = credit + body
+        body = with_assessment(body, store.source_assessment(p['id']))
         key = f"post:{p['id']}:{version}"
         expiry = min(stamp.timestamp() + config.section('monitor').get('max_age_hours', 24) * 3600,
                      reset.timestamp() if decision.kind == 'upcoming' and reset and reset.timestamp() > now else float('inf'))
@@ -104,7 +111,7 @@ def process_post(payload, config, store, now=None):
     # on SMTP delivery and must never replay historical rows or expired notices.
     if enqueued and expiry > now:
         return {'id': key, 'kind': decision.kind, 'title': LABELS[decision.kind],
-                'username': account['username'], 'text': credit + text + context_display(context),
+                'username': account['username'], 'text': with_assessment(credit + text + context_display(context), store.source_assessment(p['id'])),
                 'url': f"https://x.com/{account['username']}/status/{p['id']}",
                 'created_at': p['created_at'], 'reason': decision.reason}
 

@@ -13,8 +13,10 @@ def context_posts(post):
             continue
         ident, author, text = str(item.get('id', '')), item.get('username'), item.get('text')
         ordered = item.get('relation') == 'preceding_in_thread' and item.get('evidence') == 'detail_order'
-        linked = (item.get('relation') == 'parent_reported_by_feed' and item.get('evidence') == 'codex_reset_parent_link'
-                  and post.get('discovery_source') == 'https://codex-reset.com/'
+        linked = (item.get('relation') == 'parent_reported_by_feed'
+                  and (post.get('discovery_source'), item.get('evidence')) in (
+                      ('https://codex-reset.com/', 'codex_reset_parent_link'),
+                      ('https://divin.cc/', 'divin_context_link'))
                   and str(item.get('reply_id')) == str(post['id']) and ident == post.get('parent_id')
                   and isinstance(author, str) and author.lower() == str(post.get('parent_username', '')).lower())
         if (not ident.isdigit() or int(ident) >= int(post['id']) or ident in seen

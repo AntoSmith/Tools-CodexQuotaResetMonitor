@@ -123,9 +123,9 @@ namespace CodexQuotaDesktop
         }
         public void ShowSetupHint()
         {
-            heading.Text = "首次使用：请先完成配置和登录";
+            heading.Text = "首次使用：请先完成设置";
             description.Name = "portableSetupDescription";
-            description.Text = "已创建本地配置。请打开配置核对账号，运行 LoginX.cmd 登录后，再启动监控。";
+            description.Text = "请在设置中配置邮件发送、监控账号和浏览器。保存后，回到主窗口点击启动监控。";
         }
     }
 }

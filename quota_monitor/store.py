@@ -1,5 +1,7 @@
 """Single connection guarded across threads; transactions preserve outbox state."""
 import sqlite3
+import json
+import re
 import threading
 import time
 from contextlib import contextmanager
@@ -34,6 +36,9 @@ class Store:
                 state TEXT DEFAULT 'pending', attempts INTEGER DEFAULT 0, batch_key TEXT,
                 PRIMARY KEY(outbox_id, recipient));
             CREATE INDEX IF NOT EXISTS mail_jobs_due ON mail_jobs(state,due);
+            CREATE TABLE IF NOT EXISTS source_assessments (
+                post_id TEXT, provider TEXT, metadata TEXT,
+                PRIMARY KEY(post_id,provider));
         ''')
         if 'expires' not in {r[1] for r in self.db.execute('PRAGMA table_info(outbox)')}:
             self.db.execute('ALTER TABLE outbox ADD COLUMN expires REAL')
@@ -67,6 +72,32 @@ class Store:
     def close(self):
         with self.lock:
             self.db.close()
+
+    def save_source_assessments(self, assessments):
+        """Keep source annotations separately; never alter outbox or reviews."""
+        from .divin_feed import normalize_assessment
+        if not isinstance(assessments, dict):
+            return
+        with self.transaction():
+            for post_id, raw in list(assessments.items())[:200]:
+                metadata = normalize_assessment(raw)
+                if (not isinstance(post_id, str) or not re.fullmatch(r'[0-9]{1,25}', post_id)
+                        or not metadata or not any(url.endswith('/status/' + post_id)
+                                                  for url in metadata['source_urls'])):
+                    continue
+                self.db.execute('''INSERT INTO source_assessments VALUES (?,?,?)
+                    ON CONFLICT(post_id,provider) DO UPDATE SET metadata=excluded.metadata''',
+                    (post_id, 'divin.cc', json.dumps(metadata, ensure_ascii=False)))
+
+    def source_assessment(self, post_id):
+        from .divin_feed import normalize_assessment
+        with self.lock:
+            row = self.db.execute('SELECT metadata FROM source_assessments WHERE post_id=? AND provider=?',
+                                  (str(post_id), 'divin.cc')).fetchone()
+        try:
+            return normalize_assessment(json.loads(row['metadata'])) if row else {}
+        except (ValueError, TypeError, RecursionError):
+            return {}
 
     def record_post(self, post_id, version, kind, raw):
         # Caller wraps record + enqueue together in transaction().

@@ -27,7 +27,7 @@ class SubscriptionSettingsTests(unittest.TestCase):
         self.assertTrue(actual[1]['enabled'])
         self.assertEqual(actual[1]['end_at'], '')
         self.assertEqual(Config.load(self.path).section('notifications')['recipient_contacts'], actual)
-        self.assertEqual(json.loads(settings_path(self.path).read_text(encoding='utf-8'))['version'], 3)
+        self.assertEqual(json.loads(settings_path(self.path).read_text(encoding='utf-8'))['version'], 4)
 
     def test_delete_all_persists_an_explicit_empty_list(self):
         save_settings(self.path, [])

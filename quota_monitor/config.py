@@ -95,7 +95,7 @@ class Config:
         if self.recipient_contacts == []:
             return
         if self.section('notifications').get('channel') == 'smtp' and not self.smtp_auth_code:
-            raise ConfigError('缺少 QQ_SMTP_AUTH_CODE：请填写 notifications 配置或同名环境变量')
+            raise ConfigError('缺少 SMTP 授权码：请在“设置 → 邮件发送”填写（QQ_SMTP_AUTH_CODE）')
 
     @property
     def accounts(self):
@@ -154,6 +154,8 @@ class Config:
     def validate_browser(self):
         self.validate(require_budget=False)
         b = self.section('browser')
+        if type(b.get('divin_feed_enabled', True)) is not bool:
+            raise ConfigError('browser.divin_feed_enabled 必须为 true/false')
         if type(b.get('reset_feed_enabled', False)) is not bool:
             raise ConfigError('browser.reset_feed_enabled 必须为 true/false')
         ua = b.get('reset_feed_user_agent', 'CodexQuotaResetMonitor/0.1 (personal local monitor)')

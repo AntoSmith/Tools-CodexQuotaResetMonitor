@@ -19,6 +19,7 @@ namespace CodexQuotaDesktop
         readonly Label remaining;
         readonly Panel editor;
         readonly TabPage mail;
+        public readonly SetupPanels Setup;
         readonly Timer countdown = new Timer { Interval = 1000 };
         readonly Func<string, string> testRecipient;
         DataGridViewRow selected;
@@ -30,7 +31,9 @@ namespace CodexQuotaDesktop
         readonly Func<RecipientContact[], RecipientPreferences> saveRecipients;
         public SettingsWindow(Func<bool> read, Action<bool> write, Action systemSettings, Action logs,
                               Func<RecipientPreferences> readRecipients, Func<RecipientContact[], RecipientPreferences> saveRecipients,
-                              Func<string, string> testRecipient = null)
+                              Func<string, string> testRecipient = null,
+                              Func<SetupPreferences> readSetup = null, Func<SetupPreferences, SetupPreferences> saveSetup = null,
+                              string initialTab = null)
         {
             this.read = read; this.write = write; this.saveRecipients = saveRecipients; this.testRecipient = testRecipient;
             Text = "设置 · " + AppBrand.Name; ClientSize = new Size(1000, 690);
@@ -42,7 +45,10 @@ namespace CodexQuotaDesktop
                 Font = new Font("Microsoft YaHei UI", 10F) };
             mail = new TabPage("订阅管理") { BackColor = Palette.Canvas };
             TabPage startup = new TabPage("启动设置") { BackColor = Palette.Canvas };
-            tabs.TabPages.Add(mail); tabs.TabPages.Add(startup); Controls.Add(tabs);
+            Setup = new SetupPanels(readSetup, saveSetup, delegate { tabs.SelectedTab = mail; });
+            tabs.TabPages.Add(Setup.Mail); tabs.TabPages.Add(mail); tabs.TabPages.Add(Setup.Collection); tabs.TabPages.Add(startup); Controls.Add(tabs);
+            tabs.SelectedTab = initialTab == "mail" ? Setup.Mail : mail;
+            if (initialTab == "mail") Setup.PreferMailForNewUser();
 
             Palette.Text(mail, "订阅者管理", 20, 18, 880, 34, 19, Palette.Ink, true);
             Palette.Text(mail, "在本机管理名单、订阅时间和发送偏好。选择一位订阅者开始编辑。", 20, 58, 880, 27, 10, Palette.Muted, false);
@@ -100,7 +106,7 @@ namespace CodexQuotaDesktop
             countdown.Tick += delegate { RefreshCountdown(); }; countdown.Start();
             FormClosing += delegate(object sender, FormClosingEventArgs args) {
                 if (sending) { args.Cancel = true; RecipientStatus.Text = "测试正在发送，请等待结果后关闭；不会自动重试。"; }
-                else if (dirty && MessageBox.Show(this, "还有未保存的订阅修改，确定放弃并关闭？", "未保存的修改", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) args.Cancel = true;
+                else if ((dirty || Setup.Dirty) && MessageBox.Show(this, "还有未保存的设置修改，确定放弃并关闭？", "未保存的修改", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) args.Cancel = true;
             };
 
             Palette.Text(startup, "启动与后台运行", 24, 20, 590, 35, 18, Palette.Ink, true);
@@ -119,6 +125,7 @@ namespace CodexQuotaDesktop
                 RecipientPreferences current = readRecipients(); LoadContacts(current.Contacts);
                 RecipientStatus.Text = current.Channel == "smtp" ? "已载入名单。修改后请保存；测试邮件仅发给选中的已保存邮箱。" : "当前为仅日志模式；日常提醒需启用 SMTP。手动测试仍会尝试发送邮件。";
             } catch (Exception ex) { RecipientStatus.Text = "读取失败，可重新填写并保存：" + ex.Message; RecipientStatus.ForeColor = Palette.Amber; }
+            Setup.Updated += delegate { RecipientStatus.Text = Setup.Channel == "smtp" ? "邮件发送已启用；保存收件人后可发送初始测试邮件。" : "当前仅记录日志。开启邮件提醒请到“邮件发送”页。"; };
         }
         static CheckBox Toggle(Control parent, string text, int x, int y, int width)
         {
@@ -243,15 +250,16 @@ namespace CodexQuotaDesktop
         public async Task TestSelected()
         {
             if (sending) return;
+            if (Setup.MailDirty) { RecipientStatus.Text = "请先在“邮件发送”页保存发件邮箱和授权码，再测试收信。"; RecipientStatus.ForeColor = Palette.Amber; return; }
             if (dirty || selected == null || testRecipient == null) {
                 RecipientStatus.Text = "请先保存修改并选中一位订阅者，再发送测试邮件。"; RecipientStatus.ForeColor = Palette.Amber; return;
             }
             string email = ((RecipientContact)selected.Tag).Email;
-            sending = true; mail.Enabled = false;
+            sending = true; mail.Enabled = false; Setup.SetSending(true);
             RecipientStatus.Text = "正在向选中邮箱发送测试邮件… 请勿重复操作。";
             try { string result = await Task.Run(delegate { return testRecipient(email); }); RecipientStatus.Text = result; RecipientStatus.ForeColor = Palette.Green; }
             catch (Exception ex) { RecipientStatus.Text = "发送结果未确认：" + ex.Message; RecipientStatus.ForeColor = Palette.Amber; }
-            finally { sending = false; mail.Enabled = true; }
+            finally { sending = false; mail.Enabled = true; Setup.SetSending(false); }
         }
         void Run(Action action) { try { action(); } catch (Exception ex) { Status.Text = "操作失败：" + ex.Message; Status.ForeColor = Palette.Amber; } }
         public void Reload()

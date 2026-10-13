@@ -9,7 +9,7 @@ from quota_monitor.browser import ingest, collect_report
 class BrowserTests(unittest.TestCase):
     def setUp(self):
         self.c = Config({'accounts': [{'username': 'demo', 'id': '123', 'verified': True, 'kind': 'personal'}],
-                         'notifications': {'channel': 'console'}, 'browser': {'background': False}})
+                         'notifications': {'channel': 'console'}, 'browser': {'background': False, 'divin_feed_enabled': False}})
         self.s = Store(':memory:')
 
     def tearDown(self):
@@ -58,7 +58,7 @@ class BrowserTests(unittest.TestCase):
     def test_browser_display_mode_used_by_default_and_explicit_override(self):
         for config_headless, override, expected in [(False, None, True), (True, None, False), (True, True, True)]:
             with self.subTest(config_headless=config_headless, override=override):
-                self.c.data['browser'] = {'headless': config_headless, 'background': False}
+                self.c.data['browser'] = {'headless': config_headless, 'background': False, 'divin_feed_enabled': False}
                 process = MagicMock()
                 process.communicate.return_value = ('{"accounts":[],"posts":[]}', '')
                 process.returncode = 0

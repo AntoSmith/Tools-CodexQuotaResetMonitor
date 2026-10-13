@@ -29,7 +29,8 @@ namespace CodexQuotaDesktop
                     File.WriteAllText(Path.Combine(fixture, "data", "desktop", "python-path.txt"), runtime.Runtime("python"), new System.Text.UTF8Encoding(false));
                 foreach (string file in Directory.GetFiles(Path.Combine(root, "quota_monitor"), "*.py"))
                     File.Copy(file, Path.Combine(fixture, "quota_monitor", Path.GetFileName(file)));
-                string fixtureConfig = "[notifications]\nchannel=\"smtp\"\nto=\"old@example.com\"\n";
+                string fixtureConfig = "[notifications]\nchannel=\"smtp\"\nto=\"old@example.com\"\nusername=\"sender@example.test\"\nQQ_SMTP_AUTH_CODE=\"base-fixture-only\"\n"
+                    + "[browser]\nchannel=\"chrome\"\n[[accounts]]\nusername=\"demo\"\nid=\"123\"\nkind=\"personal\"\nverified=false\n";
                 File.WriteAllText(Path.Combine(fixture, "config.browser.local.toml"), fixtureConfig, new System.Text.UTF8Encoding(false));
                 RecipientSettings bridge = new RecipientSettings(fixture);
                 Check(bridge.Read().Recipients == "old@example.com", "Bridge did not read base configuration");
@@ -46,6 +47,15 @@ namespace CodexQuotaDesktop
                 try { bridge.Save("invalid"); } catch (InvalidOperationException) { rejected = true; }
                 Check(rejected && bridge.Read().Recipients == "a@example.com;b@example.com;c@example.com", "Bridge invalid save changed settings");
                 Check(File.ReadAllText(Path.Combine(fixture, "config.browser.local.toml")) == fixtureConfig, "Bridge modified original TOML");
+                SetupPreferences initialSetup = bridge.ReadSetup();
+                Check(initialSetup.Transport.AuthCodePresent && initialSetup.Transport.AuthCode == "", "Setup bridge returned a saved authorization code");
+                SetupPreferences configured = bridge.SaveSetup(new SetupPreferences { Transport = new MailTransport {
+                    Channel = "smtp", Host = "smtp.qq.com", Port = 465, Username = "sender@example.test", AuthCode = "new-fixture-only" } });
+                Check(configured.Transport.AuthCodePresent && configured.Transport.AuthCode == "" && bridge.Read().Contacts.Length == 3, "Transport save lost contacts or exposed code");
+                configured = bridge.SaveSetup(new SetupPreferences { Collection = new CollectionPreferences {
+                    BrowserChannel = "msedge", Accounts = new MonitoredAccount[] { new MonitoredAccount { Username = "demo", Enabled = true } } } });
+                Check(configured.Collection.BrowserChannel == "msedge" && configured.Collection.Accounts[0].Verified && configured.Ready, "Collection save did not confirm mapped account or setup readiness");
+                Check(File.ReadAllText(Path.Combine(fixture, "config.browser.local.toml")) == fixtureConfig, "Setup bridge modified original TOML");
                 // A stalled helper must not block a large stdin write indefinitely.
                 File.WriteAllText(Path.Combine(fixture, "quota_monitor", "desktop_settings.py"), "import time\ntime.sleep(30)\n");
                 var timeoutWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -68,6 +78,8 @@ namespace CodexQuotaDesktop
                         return new RecipientPreferences { Contacts = value, Channel = "smtp", Count = value.Length, AppliedMessage = "监控已重新启动。" };
                     }, delegate(string email) { testMails++; Check(email == "first@example.com", "Wrong test recipient"); return "SMTP 服务器已接受测试邮件，请确认收件。"; })) {
                     Check(settings.RecipientsGrid.Rows.Count == 3 && Convert.ToString(settings.RecipientsGrid.Rows[0].Cells[0].Value) == "我的主邮箱", "Recipient settings not loaded");
+                    Check(settings.Controls.Find("smtpAuthCodeInput", true).Length == 1, "SMTP setup is missing from settings UI");
+                    Check(((TextBox)settings.Controls.Find("smtpAuthCodeInput", true)[0]).UseSystemPasswordChar, "Authorization code is not masked by default");
                     settings.AddRecipient();
                     Check(settings.RecipientsGrid.Rows.Count == 4, "Add recipient failed");
                     settings.RemoveRecipient();
@@ -104,6 +116,41 @@ namespace CodexQuotaDesktop
                     Check(testMails == 1 && settings.RecipientStatus.Text.Contains("接受"), "Single-recipient test status missing");
                     settings.EnabledSwitch.Checked = true; settings.SaveRecipients();
                     Snapshot(settings, Path.Combine(output, "settings-preview.png"));
+                }
+                bool failMail = false; SetupPreferences submitted = null;
+                SetupPreferences currentSetup = new SetupPreferences { Ready = true,
+                    Transport = new MailTransport { Channel = "smtp", Host = "smtp.qq.com", Port = 465, Username = "sender@example.test", AuthCodePresent = true },
+                    Collection = new CollectionPreferences { BrowserChannel = "chrome", Accounts = new MonitoredAccount[] {
+                        new MonitoredAccount { Username = "demo", Id = "123", Kind = "personal", Enabled = true, Verified = true } } } };
+                using (SettingsWindow settings = new SettingsWindow(delegate { return false; }, delegate(bool value) { }, delegate { }, delegate { },
+                    delegate { return new RecipientPreferences { Contacts = recipients, Channel = "smtp" }; },
+                    delegate(RecipientContact[] value) { return new RecipientPreferences { Contacts = value, Channel = "smtp", Count = value.Length }; },
+                    delegate(string email) { testMails++; return "SMTP 服务器已接受"; }, delegate { return currentSetup; }, delegate(SetupPreferences value) {
+                        if (failMail) throw new InvalidOperationException("授权码格式无效");
+                        submitted = value;
+                        if (value.Transport != null) currentSetup.Transport = new MailTransport { Channel = value.Transport.Channel, Host = value.Transport.Host,
+                            Port = value.Transport.Port, Username = value.Transport.Username, AuthCodePresent = !value.Transport.ClearAuthCode };
+                        if (value.Collection != null) currentSetup.Collection = value.Collection;
+                        return currentSetup;
+                    }, "mail")) {
+                    Check(settings.Setup.AuthCode.Text == "" && settings.Setup.AuthCode.UseSystemPasswordChar, "Saved code displayed on opening UI");
+                    settings.Setup.ShowCode.Checked = true; Check(!settings.Setup.AuthCode.UseSystemPasswordChar, "Show-code switch did not change masking");
+                    settings.Setup.AuthCode.Text = "ui-fixture-only";
+                    settings.TestSelected().GetAwaiter().GetResult();
+                    Check(testMails == 1 && settings.RecipientStatus.Text.Contains("邮件发送"), "Unsaved SMTP settings allowed a test send");
+                    settings.Setup.SaveMail();
+                    Check(submitted.Transport.AuthCode == "ui-fixture-only" && submitted.Collection == null, "SMTP save leaked across independent settings sections");
+                    Check(settings.Setup.AuthCode.Text == "" && settings.Setup.AuthCode.UseSystemPasswordChar && !settings.Setup.MailDirty, "Successful save did not clear secret and restore masking");
+                    settings.Setup.Sender.Text = "replacement@example.test"; failMail = true; settings.Setup.SaveMail();
+                    Check(settings.Setup.MailDirty && settings.Setup.MailStatus.Text.Contains("未保存"), "Failed save discarded unsaved input or reported success");
+                    failMail = false; settings.Setup.SaveMail();
+                    settings.Setup.Browser.SelectedIndex = 1; settings.Setup.SaveCollection();
+                    Check(submitted.Transport == null && submitted.Collection.BrowserChannel == "msedge", "Collection save overwrote transport settings");
+                    Check(!settings.Setup.Dirty, "Saved settings still marked dirty");
+                    settings.Setup.AuthCode.Text = "discard-fixture-only"; settings.Setup.ClearCode.Checked = true; settings.Setup.SaveMail();
+                    Check(submitted.Transport.ClearAuthCode && submitted.Transport.AuthCode == "", "Clear-code choice submitted a conflicting new authorization code");
+                    settings.Setup.AuthCode.Text = "preview-fixture-only"; settings.Setup.SaveMail();
+                    Snapshot(settings, Path.Combine(output, "settings-smtp-preview.png"));
                 }
                 using (MonitorProcess runner = new MonitorProcess(root)) {
                     int previous = runner.Generation; runner.Stop();

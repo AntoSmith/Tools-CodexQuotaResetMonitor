@@ -17,6 +17,7 @@ max_posts = 5               # 每账号最多检查 5 条最新发现帖子的�
 max_scrolls = 1             # 只看头部，最多向下滚动一次；0 为完全不滚动
 context_enabled = true      # 读取回复详情的上文候选，含糊回应只标为待核实
 reset_feed_enabled = true   # 从 codex-reset.com 公开接口发现 Tibo 回复，失败回退公开主页
+divin_feed_enabled = true   # 从 divin.cc 补充事件类型/范围/原因与 X 详情链接；第三方判断独立展示
 # 公开部署请改为带项目联系网址的 User-Agent；无需 X API Key。
 reset_feed_user_agent = "CodexQuotaResetMonitor/0.1 (personal local monitor)"
 conversation_urls = []      # 可选：最多 5 个 https://x.com/用户名/status/数字ID 对话链接

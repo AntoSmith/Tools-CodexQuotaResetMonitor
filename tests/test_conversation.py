@@ -44,6 +44,22 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(classify(self.reply['text']).kind,'ignore')
         for parent in ['Please reset my password.', 'Nice release.']:
             self.assertEqual(classify(self.reply['text'],context=parent).kind,'ignore')
+
+    def test_divin_link_reads_original_parent_but_never_asserts_verified_reply(self):
+        reply = copy.deepcopy(self.reply)
+        reply.update(discovery_source='https://divin.cc/', parent_id=self.parent['id'],
+                     parent_username=self.parent['username'])
+        reply['context'][0].update(relation='parent_reported_by_feed',
+                                    evidence='divin_context_link', reply_id=reply['id'])
+        result = ingest({'posts': [reply]}, self.config, self.store, self.now)
+        self.assertEqual(result['alerts'][0]['kind'], 'uncertain')
+        self.assertIn('未核实直接回复关系', result['alerts'][0]['text'])
+        reply['context'][0]['evidence'] = 'codex_reset_parent_link'
+        other = Store(':memory:')
+        try:
+            self.assertEqual(ingest({'posts': [reply]}, self.config, other, self.now)['alerts'], [])
+        finally:
+            other.close()
         self.assertEqual(classify('Here is a photo of my dog.',context=self.parent['text']).kind,'ignore')
         self.assertEqual(classify('请重置密码。',context=self.parent['text']).kind,'ignore')
         d=classify('好吧，行。但它周二还是会到的。', context='你们欠我们一次额度重置。')

@@ -18,6 +18,40 @@ def block(value):
     return escape(value).replace('\n', '<br>')
 
 
+DIVIN_KEYS = {'第三方事件类型', '第三方覆盖范围', '第三方重置原因', '第三方事件阶段',
+              '第三方判断依据', '第三方采集时间', '第三方参考来源', '第三方证据链接'}
+
+
+def divin_card(fields):
+    """Display third-party context without changing notification classification."""
+    if fields.get('第三方参考来源') != 'https://divin.cc/':
+        return ''
+    rows = []
+    for label, key in [('事件类型', '第三方事件类型'), ('覆盖范围', '第三方覆盖范围'),
+                       ('重置原因', '第三方重置原因'), ('事件阶段', '第三方事件阶段'),
+                       ('判断依据', '第三方判断依据'), ('采集于', '第三方采集时间')]:
+        value = fields.get(key)
+        if value:
+            if key == '第三方采集时间':
+                value = readable_time(value)
+            rows.append(f'<tr><td valign="top" style="padding:5px 12px 5px 0;color:#7b7890;font-size:12px;width:72px;">{label}</td>'
+                        f'<td style="padding:5px 0;color:#4b4662;font-size:13px;line-height:1.8;overflow-wrap:anywhere;">{escape(value)}</td></tr>')
+    evidence_urls = []
+    for url in fields.get('第三方证据链接', '').split():
+        if re.fullmatch(r'https://x\.com/[A-Za-z0-9_]{1,15}/status/[0-9]+', url) and url not in evidence_urls:
+            evidence_urls.append(url)
+            if len(evidence_urls) == 6:
+                break
+    links = ['<a href="https://divin.cc/" style="color:#665b8c;text-decoration:underline;">查看 divin.cc 整理 ↗</a>']
+    links.extend(f'<a href="{escape(url, quote=True)}" style="color:#665b8c;text-decoration:underline;">证据原帖 {index} ↗</a>'
+                 for index, url in enumerate(evidence_urls, 1))
+    return ('<div style="margin-top:24px;border:1px solid #e3deed;border-radius:10px;padding:18px 20px;background:#f8f7fb;">'
+            '<p style="margin:0 0 10px;color:#5b5277;font-size:13px;font-weight:bold;">事件补充 · divin.cc 整理</p>'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{"".join(rows)}</table>'
+            '<p style="margin:12px 0 0;color:#817b91;font-size:11px;line-height:1.8;">第三方整理，未作为官方确认或自动分类依据</p>'
+            f'<p style="margin:10px 0 0;font-size:12px;line-height:2;">{" &nbsp; · &nbsp; ".join(links)}</p></div>')
+
+
 def preference_card(preferences):
     if preferences is None:
         return ''
@@ -55,14 +89,17 @@ def render_email(title, body, *, preferences=None, mascot_cid=None):
         prefix, original = body.split(marker, 1)
     fields, notes = {}, []
     keys = {'分类', '依据', '要点', '原文模式', '账号', '原帖', '发布时间（北京时间）', '采集时间（北京时间）',
-            '发布至采集延迟', '候选重置时间（北京时间）'}
+            '发布至采集延迟', '候选重置时间（北京时间）'} | DIVIN_KEYS
     if original is not None:
-        for line in prefix.splitlines():
+        for line in prefix.split('\n'):
             key, separator, value = line.partition('：')
             if separator and key in keys and key not in fields:
                 fields[key] = value.strip()
             elif line.strip():
                 notes.append(line)
+    third_party = divin_card(fields)
+    if not third_party:
+        notes.extend(f'{key}：{value}' for key, value in fields.items() if key in DIVIN_KEYS)
     demo = '演示' in title or '测试' in title
     label = '线索汇总' if digest else '监控消息'
     color, tint = '#255b74', '#eaf3f7'
@@ -139,6 +176,7 @@ def render_email(title, body, *, preferences=None, mascot_cid=None):
 <p style="font-size:15px;line-height:1.9;color:#536e77;margin:0;">{escape(intro)}</p>
 {f'<p style="font-size:15px;line-height:1.9;color:#254c56;margin:16px 0 0;padding:14px 16px;background:#f1f8f5;border-radius:10px;">{escape(takeaway)}</p>' if takeaway else ''}
 {timing}
+{third_party}
 <div style="margin-top:26px;border:1px solid #dfe9ec;border-left:4px solid #81b6aa;border-radius:10px;padding:20px;background:#f8fbfb;">
 <p style="font-size:12px;letter-spacing:1px;color:#637e85;font-weight:bold;margin:0 0 10px;">{original_label if original is not None else '消息内容'}</p>
 {f'<p style="font-size:12px;color:#526f77;margin:0 0 14px;">{escape(author)}</p>' if author else ''}

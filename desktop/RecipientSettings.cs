@@ -20,6 +20,32 @@ namespace CodexQuotaDesktop
         public int Count;
         public RecipientContact[] Contacts;
         public string Message;
+        public SetupPreferences Setup;
+    }
+
+    internal sealed class MailTransport
+    {
+        public string Channel = "console", Host = "smtp.qq.com", Username = "", AuthCode = "", AuthCodeSource = "none";
+        public int Port = 465;
+        public bool AuthCodePresent, ClearAuthCode;
+    }
+    internal sealed class MonitoredAccount
+    {
+        public string Username, Id, Kind;
+        public bool Enabled, Verified;
+    }
+    internal sealed class CollectionPreferences
+    {
+        public string BrowserChannel = "chrome";
+        public MonitoredAccount[] Accounts = new MonitoredAccount[0];
+    }
+    internal sealed class SetupPreferences
+    {
+        public MailTransport Transport;
+        public CollectionPreferences Collection;
+        public string Source, AppliedMessage;
+        public bool RepairNeeded, Ready;
+        public string[] MissingSteps = new string[0];
     }
 
     internal sealed class RecipientSettings
@@ -27,6 +53,24 @@ namespace CodexQuotaDesktop
         readonly string root;
         public RecipientSettings(string root) { this.root = root; }
         public RecipientPreferences Read() { return Call("read", null); }
+        public SetupPreferences ReadSetup() { return Call("read-setup", null).Setup; }
+        public SetupPreferences SaveSetup(SetupPreferences value)
+        {
+            Dictionary<string, object> request = new Dictionary<string, object>();
+            if (value.Transport != null) {
+                MailTransport transport = value.Transport;
+                request["transport"] = new Dictionary<string, object> { { "channel", transport.Channel },
+                    { "host", transport.Host }, { "port", transport.Port }, { "username", transport.Username },
+                    { "auth_code", transport.AuthCode }, { "clear_auth_code", transport.ClearAuthCode } };
+            }
+            if (value.Collection != null) {
+                List<Dictionary<string, object>> accounts = new List<Dictionary<string, object>>();
+                foreach (MonitoredAccount account in value.Collection.Accounts)
+                    accounts.Add(new Dictionary<string, object> { { "username", account.Username }, { "enabled", account.Enabled } });
+                request["collection"] = new Dictionary<string, object> { { "browser_channel", value.Collection.BrowserChannel }, { "accounts", accounts } };
+            }
+            return Call("save-setup", request).Setup;
+        }
         public string Test(string email) { return Call("test", new Dictionary<string, object> { { "email", email } }).Message; }
         public RecipientPreferences Save(string recipients) { return Call("save", new Dictionary<string, object> { { "recipients", recipients } }); }
         public RecipientPreferences Save(RecipientContact[] contacts)
@@ -81,6 +125,26 @@ namespace CodexQuotaDesktop
                 if (!Convert.ToBoolean(result["ok"])) throw new InvalidOperationException(Convert.ToString(result["error"]));
                 if (process.ExitCode != 0) throw new InvalidOperationException("邮箱设置进程异常退出。");
                 if (action == "test") return new RecipientPreferences { Message = Convert.ToString(result["message"]) };
+                if (action == "read-setup" || action == "save-setup") {
+                    var transport = (Dictionary<string, object>)result["transport"];
+                    var collection = (Dictionary<string, object>)result["collection"];
+                    List<MonitoredAccount> accounts = new List<MonitoredAccount>();
+                    foreach (object row in (System.Collections.IEnumerable)collection["accounts"]) {
+                        var account = (Dictionary<string, object>)row;
+                        accounts.Add(new MonitoredAccount { Username = Convert.ToString(account["username"]),
+                            Id = Convert.ToString(account["id"]), Kind = Convert.ToString(account["kind"]),
+                            Enabled = Convert.ToBoolean(account["enabled"]), Verified = Convert.ToBoolean(account["verified"]) });
+                    }
+                    return new RecipientPreferences { Setup = new SetupPreferences {
+                        Transport = new MailTransport { Channel = Convert.ToString(transport["channel"]), Host = Convert.ToString(transport["host"]),
+                            Port = Convert.ToInt32(transport["port"]), Username = Convert.ToString(transport["username"]),
+                            AuthCodePresent = Convert.ToBoolean(transport["auth_code_present"]),
+                            AuthCodeSource = transport.ContainsKey("auth_code_source") ? Convert.ToString(transport["auth_code_source"]) : "none" },
+                        Collection = new CollectionPreferences { BrowserChannel = Convert.ToString(collection["browser_channel"]), Accounts = accounts.ToArray() },
+                        Source = Convert.ToString(result["source"]), RepairNeeded = Convert.ToBoolean(result["repair_needed"]),
+                        Ready = result.ContainsKey("ready") && Convert.ToBoolean(result["ready"]),
+                        MissingSteps = result.ContainsKey("missing_steps") ? Strings(result["missing_steps"]) : new string[0] } };
+                }
                 List<RecipientContact> contacts = new List<RecipientContact>();
                 foreach (object row in (System.Collections.IEnumerable)result["contacts"]) {
                     var contact = (Dictionary<string, object>)row;
@@ -91,6 +155,12 @@ namespace CodexQuotaDesktop
                 return new RecipientPreferences { Recipients = Convert.ToString(result["recipients"]), Contacts = contacts.ToArray(),
                     Channel = Convert.ToString(result["channel"]), Count = result.ContainsKey("count") ? Convert.ToInt32(result["count"]) : 0 };
             }
+        }
+        static string[] Strings(object values)
+        {
+            List<string> result = new List<string>();
+            foreach (object value in (System.Collections.IEnumerable)values) result.Add(Convert.ToString(value));
+            return result.ToArray();
         }
     }
 }

@@ -23,6 +23,9 @@ def background_browser(profile, channel, stop=None, timeout=20):
 def ingest(report, config, store, now=None, on_accepted=None):
     accepted = 0
     alerts = []
+    divin = report.get('divin_feed', {})
+    if isinstance(divin, dict) and divin.get('status') == 'ok':
+        store.save_source_assessments(divin.get('assessments', {}))
     for post in report.get('posts', []):
         account = next((a for a in config.accounts if a['username'].lower() == str(post.get('username', '')).lower()), None)
         if (account is None or post.get('complete') is not True or not parse_time(post.get('created_at'))
@@ -32,7 +35,7 @@ def ingest(report, config, store, now=None, on_accepted=None):
                            'created_at': post['created_at'], 'text': post['text']},
                    'collection': {'source': 'browser_dom', 'coverage': 'partial_unverified',
                                   'timestamp_source': post.get('timestamp_source')}}
-        if post.get('discovery_source') == 'https://codex-reset.com/':
+        if post.get('discovery_source') in ('https://codex-reset.com/', 'https://divin.cc/'):
             payload['collection'].update({key:post.get(key) for key in
                 ('discovery_source','feed_fetched_at','parent_id','parent_username','context_status')})
         if config.section('browser').get('context_enabled', True):
@@ -103,9 +106,13 @@ def collect_report(config, stop=None, headed=None, profile_only=False):
     b = config.section('browser')
     start = time.monotonic()
     feed = {'status':'disabled', 'candidates':[]}
+    divin = {'status':'disabled', 'candidates':[], 'assessments':{}}
     if not profile_only and b.get('reset_feed_enabled', False):
         from .reset_feed import collect_candidates
         feed = collect_candidates(config)
+    if not profile_only and b.get('divin_feed_enabled', True):
+        from .divin_feed import collect_candidates
+        divin = collect_candidates(config)
     if stop and stop.is_set():
         raise ConfigError('浏览器采集已停止')
     node, env = browser_runtime(config)
@@ -115,7 +122,11 @@ def collect_report(config, stop=None, headed=None, profile_only=False):
                    headed=not b.get('headless', False) if headed is None else headed,
                    max_posts=b.get('max_posts', 5), max_scrolls=b.get('max_scrolls', 1),
                    profile_only=profile_only, context_enabled=b.get('context_enabled', True),
-                   conversation_urls=[] if profile_only else b.get('conversation_urls', []), reset_feed=feed)
+                   conversation_urls=[] if profile_only else b.get('conversation_urls', []), reset_feed=feed,
+                   divin_feed={key: value for key, value in divin.items() if key != 'assessments'})
+    # Provider prose is not required by the browser. Send only discovery links.
+    options['divin_feed']['candidates'] = [{k:v for k,v in p.items() if k != 'third_party'}
+                                          for p in divin.get('candidates', [])]
     deadline = start + b.get('timeout_seconds', 300)
     with ExitStack() as cleanup:
         if options['headed'] and headed is None and b.get('background', os.name == 'nt'):
@@ -142,6 +153,7 @@ def collect_report(config, stop=None, headed=None, profile_only=False):
             if not isinstance(report, dict) or not isinstance(report.get('accounts'), list) or not isinstance(report.get('posts'), list):
                 raise ConfigError('浏览器采集报告格式错误')
             report['reset_feed'] = {k:v for k,v in feed.items() if k != 'candidates'}
+            report['divin_feed'] = {k:v for k,v in divin.items() if k != 'candidates'}
             report['duration_seconds'] = round(time.monotonic()-start, 2)
             return report
         finally:
@@ -168,6 +180,7 @@ def summary(report):
     return {'collected_at':report.get('collected_at'), 'browser_mode':report.get('browser_mode'),
             'duration_seconds':report.get('duration_seconds'), 'pages_visited':report.get('pages_visited'),
             'reset_feed':report.get('reset_feed'),
+            'divin_feed':{k:v for k,v in report.get('divin_feed', {}).items() if k != 'assessments'},
             'coverage':'partial_unverified' if report.get('posts') else 'unavailable',
             'accounts':report.get('accounts'), 'posts':[{
                 'id':p['id'], 'username':p['username'], 'created_at':p.get('created_at'),

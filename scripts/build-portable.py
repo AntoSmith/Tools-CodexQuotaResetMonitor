@@ -53,7 +53,8 @@ APP_SOURCE_FILES = (
     'quota_monitor/desktop_settings.py', 'quota_monitor/email_html.py',
     'quota_monitor/email_message.py', 'quota_monitor/email_preview.py',
     'quota_monitor/email_test.py', 'quota_monitor/history.py', 'quota_monitor/notify.py',
-    'quota_monitor/reset_feed.py', 'quota_monitor/service.py',
+    'quota_monitor/reset_feed.py', 'quota_monitor/divin_feed.py',
+    'quota_monitor/source_notes.py', 'quota_monitor/service.py',
     'quota_monitor/signal_email.py', 'quota_monitor/store.py',
     'quota_monitor/subscription.py', 'quota_monitor/subscription_test.py',
     'quota_monitor/xapi.py', 'quota_monitor/browser_collect.cjs',
@@ -63,6 +64,7 @@ APP_SOURCE_FILES = (
     'assets/feature-overview.svg', 'assets/screenshots/dashboard.png',
     'assets/screenshots/alert.png', 'assets/screenshots/history.png',
     'assets/screenshots/subscribers.png', 'assets/screenshots/email-demo.png',
+    'assets/screenshots/mail-settings.png',
     'assets/email/celebrate.gif', 'assets/email/celebrate.png',
     'assets/email/neutral.gif', 'assets/email/neutral.png',
     'assets/email/uncertain.gif', 'assets/email/uncertain.png', 'assets/email/README.md',
@@ -70,7 +72,7 @@ APP_SOURCE_FILES = (
 DESKTOP_SOURCE_FILES = (
     'AlertWindow.cs', 'AppBrand.cs', 'DashboardState.cs', 'DashboardWindow.cs',
     'HistoryClient.cs', 'HistoryVerification.cs', 'HistoryWindow.cs', 'Launcher.cs',
-    'PortableVerification.cs', 'RecipientSettings.cs', 'ReviewPanel.cs', 'SettingsWindow.cs', 'TrayApplication.cs',
+    'PortableVerification.cs', 'RecipientSettings.cs', 'ReviewPanel.cs', 'SettingsWindow.cs', 'SetupPanels.cs', 'TrayApplication.cs',
     'UiVerification.cs',
 )
 FORBIDDEN_COMPONENTS = {
