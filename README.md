@@ -28,6 +28,7 @@
 | 🎨 历史分类 | 🟢确定 / 🟠模糊 / 🟣不确定 / ⚪未标记，保存原文与版本，支持筛选、改标和清除。 |
 | 👥 本地订阅管理 | 中文备注、多邮箱、启停、起止时间、续期、待核实开关、单人测试邮件。 |
 | ⚙️ 界面配置 | 发件邮箱、授权码、QQ / 自定义 SMTP、Chrome / Edge 和监控账号，都在设置中完成。 |
+| ⬆️ 检查更新 | 设置或托盘检查 GitHub 新版本，选择下载升级；保留本机配置、邮箱名单和历史数据。 |
 | 📬 个性化邮件 | 原文与来源、北京时间、接收偏好、卡通动图；支持即时、半小时汇总、每日汇总及夜间免打扰。 |
 
 </details>
@@ -41,7 +42,7 @@
   </tr>
   <tr>
     <td><strong>历史线索</strong><br>按颜色分类，回看原文与上下文<br><br><img src="assets/screenshots/history.png" alt="历史线索与四色人工标记：合成数据" width="100%"></td>
-    <td><strong>新线索提醒</strong><br>查看来源，选择判断，留待以后回看<br><br><img src="assets/screenshots/alert.png" alt="新线索弹窗：合成示例及人工标记按钮" width="100%"></td>
+    <td><strong>新线索提醒</strong><br>原文醒目，第三方摘要分层，长依据可展开<br><br><img src="assets/screenshots/alert.png" alt="新线索弹窗：合成示例及人工标记按钮" width="100%"></td>
   </tr>
 </table>
 
@@ -92,6 +93,8 @@ flowchart LR
 3. 在 **采集设置** 选择浏览器并核对监控账号；在 **订阅管理** 添加收件人、保存并发送初始测试邮件。
 4. 回到主窗口点击 **启动监控**。日常使用无需手动编辑配置文件。
 
+后续在 **设置 → 软件更新** 或托盘的 **检查更新** 中升级。下载并校验后替换程序文件，保留本机配置、收件人、订阅偏好及历史；升级前请保存设置。安装时短暂退出，完成后自动重新打开，并保留监控启停状态。
+
 便携版包含运行依赖，使用本机已有的 Chrome 或 Edge；解压后请保留整个文件夹。下载包只带模板，运行产生的配置、名单与数据保存在使用者本机。
 
 <details>
@@ -111,7 +114,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 2. 在 **订阅管理** 中添加收件人及偏好；在 **启动设置** 中选择自启动。
 3. 在 **历史线索** 中回看记录；关闭主窗口收回托盘，托盘“退出”停止监控。
 
-便携包构建：`python scripts/build-portable.py --version 0.2.1`。下载来源、校验与许可证见包内 `runtime-provenance.json` 和 `THIRD_PARTY_NOTICES.txt`。
+便携包构建：`python scripts/build-portable.py --version 0.2.2`。下载来源、校验与许可证见包内 `runtime-provenance.json` 和 `THIRD_PARTY_NOTICES.txt`。
 
 </details>
 

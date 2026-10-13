@@ -21,12 +21,18 @@ namespace CodexQuotaDesktop
         AlertWindow popup;
         HistoryWindow historyWindow;
         SettingsWindow settingsWindow;
+        UpdateWindow updateWindow;
         readonly IHistoryRepository history;
         public TrayApplication(string root, bool hidden, bool launch) : this(root, hidden, launch, true) { }
         public TrayApplication(string root, bool hidden, bool launch, bool startMonitoring)
             : this(root, hidden, launch, startMonitoring, new DashboardWindow(), null) { }
+        public TrayApplication(string root, bool hidden, bool launch, bool startMonitoring, bool resumeMonitoring)
+            : this(root, hidden, launch, startMonitoring, new DashboardWindow(), null, resumeMonitoring) { }
         internal TrayApplication(string root, bool hidden, bool launch, bool startMonitoring,
             DashboardWindow dashboard, Action<SettingsWindow> configureSettings)
+            : this(root, hidden, launch, startMonitoring, dashboard, configureSettings, true) { }
+        internal TrayApplication(string root, bool hidden, bool launch, bool startMonitoring,
+            DashboardWindow dashboard, Action<SettingsWindow> configureSettings, bool resumeMonitoring)
         {
             setupPending = !startMonitoring;
             this.root = root; this.configureSettings = configureSettings;
@@ -48,6 +54,7 @@ namespace CodexQuotaDesktop
             menu.Items.Add("打开配置", null, delegate { OpenConfig(); });
             menu.Items.Add("查看日志", null, delegate { OpenLog(); });
             menu.Items.Add("设置", null, delegate { OpenSettings(); });
+            menu.Items.Add("检查更新…", null, delegate { OpenUpdates(); });
             startupItem = new ToolStripMenuItem("登录 Windows 后自动启动"); RefreshStartup();
             startupItem.Click += delegate {
                 try { Startup.Set(!Startup.Enabled()); startupItem.Checked = Startup.Enabled(); }
@@ -65,7 +72,7 @@ namespace CodexQuotaDesktop
             Refresh();
             if (launch) {
                 timer.Start();
-                if (startMonitoring) StartMonitor();
+                if (startMonitoring && resumeMonitoring) StartMonitor();
                 if (!hidden || setupPending) ShowWindow();
                 if (setupPending) window.BeginInvoke(new MethodInvoker(delegate { if (!closing && setupPending) OpenSettings("mail"); }));
             }
@@ -161,7 +168,7 @@ namespace CodexQuotaDesktop
                     } else saved.AppliedMessage = !saved.Ready ? IncompleteSetupMessage(saved) : "已保存，请回到主窗口点击“启动监控”。";
                     Refresh();
                     return saved;
-                }, initialTab)) {
+                }, initialTab, OpenUpdates)) {
                 settingsWindow = settings;
                 try { if (configureSettings != null) configureSettings(settings); settings.ShowDialog(window); }
                 finally { settingsWindow = null; }
@@ -173,6 +180,19 @@ namespace CodexQuotaDesktop
             string remaining = settings == null || settings.MissingSteps == null || settings.MissingSteps.Length == 0
                 ? "邮件发送、订阅者、监控账号和浏览器设置" : String.Join("、", settings.MissingSteps);
             return "设置已保存；请先完成：" + remaining + "。完成后回到主窗口点击“启动监控”。";
+        }
+        void OpenUpdates()
+        {
+            if (updateWindow != null) { updateWindow.Activate(); return; }
+            using (UpdateWindow updates = new UpdateWindow(root, Quit, delegate {
+                return settingsWindow != null && settingsWindow.BlocksUpgrade
+                    ? "请先保存设置修改，并等待测试邮件完成，再升级。" : "";
+            }, install: delegate(string plan) { ReleaseUpdates.LaunchInstaller(root, plan, state.Active); })) {
+                updateWindow = updates;
+                updates.Shown += async delegate { await updates.CheckAsync(); };
+                try { updates.ShowDialog(settingsWindow == null ? (IWin32Window)window : settingsWindow); }
+                finally { updateWindow = null; }
+            }
         }
         void ApplySetupReadiness(SetupPreferences settings)
         {
@@ -195,6 +215,7 @@ namespace CodexQuotaDesktop
         {
             if (closing) return; closing = true;
             timer.Stop(); state.Stopped(""); monitor.Dispose();
+            if (updateWindow != null) updateWindow.Dispose();
             if (settingsWindow != null) settingsWindow.Dispose();
             if (popup != null) popup.Close();
             if (historyWindow != null) historyWindow.Close();

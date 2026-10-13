@@ -57,6 +57,22 @@ class DivinIntegrationTests(unittest.TestCase):
         self.assertIn('第三方整理', body)
         self.assertIn('作者原文：\nWe will reset Codex usage soon.', body)
 
+    def test_live_alert_separates_short_original_from_large_third_party_analysis(self):
+        info = assessment()
+        info['analysis_basis'] = '事件判断：' + '第三方推断不能视为原文或官方确认；' * 50
+        result = ingest(self.report(self.post('Reset all propagated. Sweet dreams.'), info),
+                        self.config, self.store, NOW)
+        alert = result['alerts'][0]
+        self.assertEqual(alert['kind'], 'uncertain')
+        self.assertEqual(alert.get('original_text'), 'Reset all propagated. Sweet dreams.')
+        self.assertEqual(alert.get('source_assessment'), self.store.source_assessment(POST_ID))
+        self.assertEqual(alert.get('context_text'), '')
+        self.assertEqual(alert.get('collected_at'), '2026-09-08T00:30:00Z')
+        # Existing history/mail/old desktop consumers retain complete attributed text.
+        self.assertIn('第三方判断依据：', alert['text'])
+        self.assertTrue(alert['text'].endswith('Reset all propagated. Sweet dreams.'))
+        self.assertIn('第三方推断', self.store.due(NOW)[0]['body'])
+
     def test_later_enrichment_updates_history_without_resend_or_review_change(self):
         first = ingest({'posts': [self.post()]}, self.config, self.store, NOW)
         ident = first['alerts'][0]['id']

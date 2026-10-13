@@ -23,7 +23,8 @@ namespace CodexQuotaDesktop
         readonly Timer countdown = new Timer { Interval = 1000 };
         readonly Func<string, string> testRecipient;
         DataGridViewRow selected;
-        bool loading, dirty, sending;
+        bool loading, dirty, sending, savedStartup;
+        public bool BlocksUpgrade { get { return sending || dirty || Setup.Dirty || StartupCheck.Checked != savedStartup; } }
         static readonly string[] modes = { "immediate", "digest_30m", "digest_daily", "quiet_night" };
         static DateTime Now { get { return DateTime.UtcNow.AddHours(8); } }
         readonly Func<bool> read;
@@ -33,7 +34,7 @@ namespace CodexQuotaDesktop
                               Func<RecipientPreferences> readRecipients, Func<RecipientContact[], RecipientPreferences> saveRecipients,
                               Func<string, string> testRecipient = null,
                               Func<SetupPreferences> readSetup = null, Func<SetupPreferences, SetupPreferences> saveSetup = null,
-                              string initialTab = null)
+                              string initialTab = null, Action checkUpdates = null)
         {
             this.read = read; this.write = write; this.saveRecipients = saveRecipients; this.testRecipient = testRecipient;
             Text = "设置 · " + AppBrand.Name; ClientSize = new Size(1000, 690);
@@ -47,6 +48,17 @@ namespace CodexQuotaDesktop
             TabPage startup = new TabPage("启动设置") { BackColor = Palette.Canvas };
             Setup = new SetupPanels(readSetup, saveSetup, delegate { tabs.SelectedTab = mail; });
             tabs.TabPages.Add(Setup.Mail); tabs.TabPages.Add(mail); tabs.TabPages.Add(Setup.Collection); tabs.TabPages.Add(startup); Controls.Add(tabs);
+            TabPage updates = new TabPage("软件更新") { BackColor = Palette.Canvas };
+            tabs.TabPages.Add(updates);
+            Palette.Text(updates, "软件更新", 24, 24, 890, 40, 20, Palette.Ink, true);
+            Palette.Text(updates, "检查 GitHub Releases 中的新版本，再选择是否下载升级。", 24, 78, 890, 35, 11, Palette.Muted, false);
+            Panel updateCard = new Panel { Left = 24, Top = 134, Width = 882, Height = 130, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
+            updates.Controls.Add(updateCard);
+            Palette.Text(updateCard, "你的资料会保留", 20, 18, 820, 34, 15, Palette.Ink, true);
+            Palette.Text(updateCard, "沿用本机配置、邮箱名单、订阅偏好、历史线索及浏览器资料。\n更新完成后在原目录重新打开，自启动和快捷方式继续指向原位置。", 20, 60, 820, 50, 11, Palette.Muted, false);
+            Button updateButton = Palette.Button(updates, "检查更新…", 24, 291, 174);
+            updateButton.Enabled = checkUpdates != null;
+            updateButton.Click += delegate { if (checkUpdates != null) checkUpdates(); };
             tabs.SelectedTab = initialTab == "mail" ? Setup.Mail : mail;
             if (initialTab == "mail") Setup.PreferMailForNewUser();
 
@@ -106,7 +118,7 @@ namespace CodexQuotaDesktop
             countdown.Tick += delegate { RefreshCountdown(); }; countdown.Start();
             FormClosing += delegate(object sender, FormClosingEventArgs args) {
                 if (sending) { args.Cancel = true; RecipientStatus.Text = "测试正在发送，请等待结果后关闭；不会自动重试。"; }
-                else if ((dirty || Setup.Dirty) && MessageBox.Show(this, "还有未保存的设置修改，确定放弃并关闭？", "未保存的修改", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) args.Cancel = true;
+                else if (BlocksUpgrade && MessageBox.Show(this, "还有未保存的设置修改，确定放弃并关闭？", "未保存的修改", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) args.Cancel = true;
             };
 
             Palette.Text(startup, "启动与后台运行", 24, 20, 590, 35, 18, Palette.Ink, true);
@@ -265,7 +277,7 @@ namespace CodexQuotaDesktop
         public void Reload()
         {
             try {
-                StartupCheck.Checked = read(); Status.ForeColor = Palette.Muted;
+                savedStartup = read(); StartupCheck.Checked = savedStartup; Status.ForeColor = Palette.Muted;
                 Status.Text = StartupCheck.Checked ? "启动项已登记。是否成功自启动，请查看启动日志；\n如被系统禁用，请打开 Windows 启动应用检查。" : "未登记当前程序的自启动项。勾选后点击保存即可启用。";
             } catch (Exception ex) { Status.Text = "无法读取启动设置：" + ex.Message; Status.ForeColor = Palette.Amber; }
         }

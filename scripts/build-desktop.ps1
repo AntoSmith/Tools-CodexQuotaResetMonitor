@@ -14,6 +14,6 @@ $output = Join-Path $root $OutputName
 $sources = Get-ChildItem -LiteralPath (Join-Path $root 'desktop') -Filter '*.cs' | ForEach-Object { $_.FullName }
 $icon = Join-Path $root 'assets/quota-monitor.ico'
 if (-not (Test-Path -LiteralPath $icon)) { throw 'Application icon is missing from assets/' }
-& $compiler /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll ("/win32icon:" + $icon) ("/resource:" + $icon + ',QuotaMonitor.AppIcon.ico') ("/out:" + $output) $sources
+& $compiler /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll ("/win32icon:" + $icon) ("/resource:" + $icon + ',QuotaMonitor.AppIcon.ico') ("/out:" + $output) $sources
 if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed' }
 Write-Output $output

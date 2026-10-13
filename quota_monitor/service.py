@@ -112,6 +112,8 @@ def process_post(payload, config, store, now=None):
     if enqueued and expiry > now:
         return {'id': key, 'kind': decision.kind, 'title': LABELS[decision.kind],
                 'username': account['username'], 'text': with_assessment(credit + text + context_display(context), store.source_assessment(p['id'])),
+                'original_text': text, 'context_text': context_display(context),
+                'source_assessment': store.source_assessment(p['id']), 'collected_at': iso(now),
                 'url': f"https://x.com/{account['username']}/status/{p['id']}",
                 'created_at': p['created_at'], 'reason': decision.reason}
 

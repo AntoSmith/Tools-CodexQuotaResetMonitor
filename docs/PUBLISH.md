@@ -53,7 +53,7 @@ git config --global --add safe.directory "$(pwd -W)"
 
 ## 便携版发布
 
-在 Windows 构建环境中运行 `python scripts/build-portable.py --version 0.2.1`。脚本只从明确白名单组装全新目录，下载固定版本的官方 Python embeddable、Node.js 与 Playwright 包，并核对 SHA256 或 npm integrity；不会复制当前的本地配置、运行时路径标记、名单或浏览器资料。
+在 Windows 构建环境中运行 `python scripts/build-portable.py --version 0.2.2`。脚本只从明确白名单组装全新目录，下载固定版本的官方 Python embeddable、Node.js 与 Playwright 包，并核对 SHA256 或 npm integrity；不会复制当前的本地配置、运行时路径标记、名单或浏览器资料。
 
 产物为 `dist/CodexQuotaMonitor-v0.2.1-windows-x64.zip` 和 `dist/SHA256SUMS.txt`。ZIP 自带运行依赖、许可证及来源清单，只含配置模板；首次运行时生成使用者自己的本地配置并打开界面设置。不要将测试后已产生数据的解压目录重新压缩发布，应发布构建脚本输出的原始干净 ZIP。
 

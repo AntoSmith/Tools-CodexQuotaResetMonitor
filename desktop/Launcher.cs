@@ -304,6 +304,11 @@ namespace CodexQuotaDesktop
             Directory.SetCurrentDirectory(root);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             string mode = args.Length == 0 ? "" : args[0];
+            if (mode == "--apply-update") return args.Length == 2 ? UpdateInstaller.Run(args[1]) : 2;
+            if (UpdateInstaller.IsInstalling(root)) {
+                MessageBox.Show("正在安装更新，或上次更新尚未安全完成。\n请等待安装完成；若曾中断，请查看 data/desktop/updates 中的结果与程序备份，恢复后再启动。", AppBrand.Name);
+                return 2;
+            }
             if (mode == "--portable-test") return PortableVerification.Run(args.Length > 1 ? args[1] : Path.Combine(root, "data", "desktop"));
             if (mode != "" && mode != "--autostart") Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
             if (mode == "--ui-test") return UiVerification.Run(root);
@@ -332,7 +337,7 @@ namespace CodexQuotaDesktop
                     bool firstRun = PortableConfiguration.EnsureLocalConfig(root, PortableConfiguration.PreferredBrowserChannel());
                     Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
                     if (firstRun) PortableConfiguration.MarkSetupPending(root);
-                    app = new TrayApplication(root, mode == "--autostart", true, !PortableConfiguration.IsSetupPending(root)); Application.Run(app);
+                    app = new TrayApplication(root, mode == "--autostart", true, !PortableConfiguration.IsSetupPending(root), mode != "--updated-stopped"); Application.Run(app);
                 }
                 finally { if (app != null) app.Quit(); mutex.ReleaseMutex(); }
             }

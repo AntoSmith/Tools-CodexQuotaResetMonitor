@@ -8,6 +8,8 @@ namespace CodexQuotaDesktop
     public sealed class DesktopAlert
     {
         public string Id, Kind, Title, Username, Text, Url, Reason, CreatedAt;
+        public string OriginalText, ContextText, CollectedAt;
+        public SourceAssessment Assessment;
         public bool Demo;
         public bool Celebrate { get { return Kind == "completed" || Kind == "upcoming" || Kind == "credit"; } }
         public static bool SafeUrl(string value)
@@ -22,9 +24,18 @@ namespace CodexQuotaDesktop
         }
     }
 
+    public sealed class SourceAssessment
+    {
+        public string provider, source_url, fetched_at, event_type, scope, reason, stage, analysis_basis;
+        public string[] source_urls;
+        public bool IsDivin { get { return provider == "divin.cc" && source_url == "https://divin.cc/"; } }
+    }
+
     public sealed class WireEvent
     {
         public string type, outcome, error, id, kind, title, username, text, url, reason, created_at;
+        public string original_text, context_text, collected_at;
+        public SourceAssessment source_assessment;
         public int round, posts;
         public double started_at, ended_at, next_at, interval_seconds;
     }
@@ -93,7 +104,9 @@ namespace CodexQuotaDesktop
                 && DesktopAlert.SafeUrl(e.url) && SupportedKind(e.kind) && !seen.Contains(e.id))
             {
                 DesktopAlert alert = new DesktopAlert { Id = e.id, Kind = e.kind, Title = Label(e.kind),
-                    Username = e.username ?? "", Text = e.text ?? "", Url = e.url, Reason = e.reason ?? "", CreatedAt = e.created_at };
+                    Username = e.username ?? "", Text = e.text ?? "", Url = e.url, Reason = e.reason ?? "", CreatedAt = e.created_at,
+                    OriginalText = e.original_text, ContextText = e.context_text ?? "", Assessment = e.source_assessment,
+                    CollectedAt = e.collected_at };
                 seen.Add(e.id); LastAlert = alert; Alerts.Enqueue(alert); return true;
             }
             return false;

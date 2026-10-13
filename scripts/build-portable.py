@@ -73,7 +73,7 @@ DESKTOP_SOURCE_FILES = (
     'AlertWindow.cs', 'AppBrand.cs', 'DashboardState.cs', 'DashboardWindow.cs',
     'HistoryClient.cs', 'HistoryVerification.cs', 'HistoryWindow.cs', 'Launcher.cs',
     'PortableVerification.cs', 'RecipientSettings.cs', 'ReviewPanel.cs', 'SettingsWindow.cs', 'SetupPanels.cs', 'TrayApplication.cs',
-    'UiVerification.cs',
+    'UiVerification.cs', 'ReleaseUpdates.cs', 'UpdateInstaller.cs', 'UpdateWindow.cs',
 )
 FORBIDDEN_COMPONENTS = {
     'data', 'logs', '.git', '.codex', '.agents', '__pycache__',
@@ -417,7 +417,8 @@ def compile_desktop(workspace, stage):
     output = Path(stage) / 'CodexQuotaMonitor.exe'
     command = [str(compiler), '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/debug-',
                '/codepage:65001', '/reference:System.Windows.Forms.dll', '/reference:System.Drawing.dll',
-               '/reference:System.Web.Extensions.dll', '/win32icon:' + str(icon),
+               '/reference:System.Web.Extensions.dll', '/reference:System.IO.Compression.dll',
+               '/reference:System.IO.Compression.FileSystem.dll', '/win32icon:' + str(icon),
                '/resource:' + str(icon) + ',QuotaMonitor.AppIcon.ico', '/out:' + str(output)]
     subprocess.run(command + [str(source) for source in sources], check=True, cwd=workspace)
     if not output.is_file():
@@ -501,7 +502,7 @@ def smoke_test(stage):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', default='0.2.0', help='Application release version (default: 0.2.0)')
+    parser.add_argument('--version', default='0.2.2', help='Application release version (default: 0.2.2)')
     parser.add_argument('--offline', action='store_true', help='Use already verified download-cache files only')
     parser.add_argument('--download-only', action='store_true', help='Fill and verify the official runtime download cache')
     parser.add_argument('--skip-smoke-tests', action='store_true', help='Skip bundled runtime import checks')
