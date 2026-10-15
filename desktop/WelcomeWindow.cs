@@ -77,7 +77,7 @@ namespace CodexQuotaDesktop
             title.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Label introduction = Palette.Text(body, "完成下面三步，即可在本机接收公开重置线索。", 72, 55, 504, 28, 9.5F, Palette.Muted, false);
             introduction.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Step(body, "welcome-step-mail", "1", "设置发件邮箱", 
+            Step(body, "welcome-step-mail", "1", "设置发件邮箱",
                 "在“邮件发送”填写发件邮箱和 SMTP 授权码并保存。\nQQ 邮箱需先在邮箱网页设置中开启 SMTP 服务。", 97);
             Step(body, "welcome-step-recipients", "2", "添加收件人并测试",
                 "到“订阅管理”添加收件邮箱，保存后发送测试邮件。\n收到测试邮件后，再设置提醒偏好和订阅时间。", 177);
