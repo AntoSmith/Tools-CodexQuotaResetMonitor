@@ -34,7 +34,7 @@ namespace CodexQuotaDesktop
                               Func<RecipientPreferences> readRecipients, Func<RecipientContact[], RecipientPreferences> saveRecipients,
                               Func<string, string> testRecipient = null,
                               Func<SetupPreferences> readSetup = null, Func<SetupPreferences, SetupPreferences> saveSetup = null,
-                              string initialTab = null, Action checkUpdates = null)
+                              string initialTab = null, Action checkUpdates = null, Action showGuide = null)
         {
             this.read = read; this.write = write; this.saveRecipients = saveRecipients; this.testRecipient = testRecipient;
             Text = "设置 · " + AppBrand.Name; ClientSize = new Size(1000, 690);
@@ -59,6 +59,14 @@ namespace CodexQuotaDesktop
             Button updateButton = Palette.Button(updates, "检查更新…", 24, 291, 174);
             updateButton.Enabled = checkUpdates != null;
             updateButton.Click += delegate { if (checkUpdates != null) checkUpdates(); };
+            TabPage help = new TabPage("使用指南") { BackColor = Palette.Canvas };
+            tabs.TabPages.Add(help);
+            Palette.Text(help, "从这里开始", 24, 24, 890, 40, 20, Palette.Ink, true);
+            Palette.Text(help, "配置邮件、添加收件人，再选择浏览器和监控账号。\n保存后回到主窗口点击启动监控；随时可以停止。", 24, 82, 890, 68, 12, Palette.Muted, false);
+            Button guideButton = Palette.Button(help, "重新查看使用引导", 24, 176, 228);
+            guideButton.Enabled = showGuide != null;
+            guideButton.Click += delegate { if (showGuide != null) showGuide(); };
+            Palette.Text(help, "关闭主窗口会收回右下角托盘，监控继续在后台运行。\n需要完全退出时，请在托盘菜单选择退出并停止监控。\n\n提醒是公开消息线索，请结合原帖与自己的账户状态核对。", 24, 253, 890, 150, 11, Palette.Muted, false);
             tabs.SelectedTab = initialTab == "mail" ? Setup.Mail : mail;
             if (initialTab == "mail") Setup.PreferMailForNewUser();
 
@@ -280,6 +288,12 @@ namespace CodexQuotaDesktop
                 savedStartup = read(); StartupCheck.Checked = savedStartup; Status.ForeColor = Palette.Muted;
                 Status.Text = StartupCheck.Checked ? "启动项已登记。是否成功自启动，请查看启动日志；\n如被系统禁用，请打开 Windows 启动应用检查。" : "未登记当前程序的自启动项。勾选后点击保存即可启用。";
             } catch (Exception ex) { Status.Text = "无法读取启动设置：" + ex.Message; Status.ForeColor = Palette.Amber; }
+        }
+        public void ShowMailSettings()
+        {
+            TabControl tabs = Setup.Mail.Parent as TabControl;
+            if (tabs != null) tabs.SelectedTab = Setup.Mail;
+            Activate();
         }
         public void Save(bool enabled)
         {

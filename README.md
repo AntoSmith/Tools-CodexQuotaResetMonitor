@@ -9,7 +9,8 @@
 <p align="center"><strong>Windows 后台运行</strong> · 默认每 30 分钟检查 · 无需 X API Key</p>
 
 <p align="center">
-  <a href="https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest">下载 Windows 便携版</a> ·
+  <a href="https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/download/v0.2.3/CodexQuotaMonitor-Setup-v0.2.3-windows-x64.exe">下载 Windows 安装版 EXE</a> ·
+  <a href="https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest">便携版与版本说明</a> ·
   <a href="#界面一览">界面一览</a> · <a href="#快速开始">快速开始</a> ·
   <a href="docs/USAGE.md">使用说明</a> · <a href="config.browser.example.toml">配置模板</a>
 </p>
@@ -29,6 +30,7 @@
 | 👥 本地订阅管理 | 中文备注、多邮箱、启停、起止时间、续期、待核实开关、单人测试邮件。 |
 | ⚙️ 界面配置 | 发件邮箱、授权码、QQ / 自定义 SMTP、Chrome / Edge 和监控账号，都在设置中完成。 |
 | ⬆️ 检查更新 | 设置或托盘检查 GitHub 新版本，选择下载升级；保留本机配置、邮箱名单和历史数据。 |
+| 👋 开始使用 | 单个 Setup.exe 安装，自动创建应用入口；首次引导可跳过，随时从设置再次查看。 |
 | 📬 个性化邮件 | 原文与来源、北京时间、接收偏好、卡通动图；支持即时、半小时汇总、每日汇总及夜间免打扰。 |
 
 </details>
@@ -84,18 +86,22 @@ flowchart LR
 
 ## 快速开始
 
-### 下载运行
+### 推荐：下载安装版
 
 **Windows 10/11 x64，无需自行安装 Python、Node.js 或 npm。**
 
-1. 从 [GitHub Releases](https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/latest) 下载 `windows-x64.zip`，完整解压到可写目录。
-2. 双击 `CodexQuotaMonitor.exe`，首次自动打开设置。在 **邮件发送** 填写发件邮箱和 SMTP 授权码并保存。
-3. 在 **采集设置** 选择浏览器并核对监控账号；在 **订阅管理** 添加收件人、保存并发送初始测试邮件。
-4. 回到主窗口点击 **启动监控**。日常使用无需手动编辑配置文件。
+1. 下载 [Setup.exe 安装包](https://github.com/AntoSmith/Tools-CodexQuotaResetMonitor/releases/download/v0.2.3/CodexQuotaMonitor-Setup-v0.2.3-windows-x64.exe)，双击按中文向导安装。
+2. 首次打开，选择 **立即配置**；也可选 **稍后再说 / 跳过**，之后从 **设置 → 使用指南** 继续。
+3. 在 **邮件发送** 填写发件邮箱与 SMTP 授权码；在 **订阅管理** 添加收件人、保存并发送测试邮件。
+4. 在 **采集设置** 选择浏览器和监控账号；保存后返回主窗口点击 **启动监控**。
+
+<p align="center"><img src="assets/screenshots/welcome.png" width="520" alt="可跳过的首次使用引导：邮件设置、收件人和后台监控"></p>
+
+安装版为当前 Windows 用户安装，提供开始菜单入口与可选桌面快捷方式。跳过引导保持停止，设置完成后再手动启动。日常使用无需编辑配置文件；应用升级和卸载均保留本机配置、收件名单、历史与浏览器资料。
 
 后续在 **设置 → 软件更新** 或托盘的 **检查更新** 中升级。下载并校验后替换程序文件，保留本机配置、收件人、订阅偏好及历史；升级前请保存设置。安装时短暂退出，完成后自动重新打开，并保留监控启停状态。
 
-便携版包含运行依赖，使用本机已有的 Chrome 或 Edge；解压后请保留整个文件夹。下载包只带模板，运行产生的配置、名单与数据保存在使用者本机。
+也可下载 `windows-x64.zip` 便携版，完整解压后运行 `CodexQuotaMonitor.exe`，保留整个文件夹。两个版本均包含运行依赖，使用本机已有的 Chrome 或 Edge；下载包只带模板，运行产生的配置、名单与数据保存在使用者本机。
 
 <details>
 <summary><strong>开发者：从源码构建</strong></summary>
@@ -114,7 +120,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-desktop.ps1
 2. 在 **订阅管理** 中添加收件人及偏好；在 **启动设置** 中选择自启动。
 3. 在 **历史线索** 中回看记录；关闭主窗口收回托盘，托盘“退出”停止监控。
 
-便携包构建：`python scripts/build-portable.py --version 0.2.2`。下载来源、校验与许可证见包内 `runtime-provenance.json` 和 `THIRD_PARTY_NOTICES.txt`。
+便携包构建：`python scripts/build-portable.py --version 0.2.3`。再用官方 Inno Setup 编译器运行 `python scripts/build-installer.py --archive dist/CodexQuotaMonitor-v0.2.3-windows-x64.zip --iscc <ISCC.exe路径>` 生成安装 EXE。下载来源、校验与许可证见包内 `runtime-provenance.json` 和 `THIRD_PARTY_NOTICES.txt`。
 
 </details>
 

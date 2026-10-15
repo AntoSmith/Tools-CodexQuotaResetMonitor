@@ -337,7 +337,7 @@ namespace CodexQuotaDesktop
                     bool firstRun = PortableConfiguration.EnsureLocalConfig(root, PortableConfiguration.PreferredBrowserChannel());
                     Directory.CreateDirectory(Path.Combine(root, "data", "desktop"));
                     if (firstRun) PortableConfiguration.MarkSetupPending(root);
-                    app = new TrayApplication(root, mode == "--autostart", true, !PortableConfiguration.IsSetupPending(root), mode != "--updated-stopped"); Application.Run(app);
+                    app = new TrayApplication(root, mode == "--autostart", true, !PortableConfiguration.IsSetupPending(root), mode != "--updated-stopped" && mode != "--after-install"); Application.Run(app);
                 }
                 finally { if (app != null) app.Quit(); mutex.ReleaseMutex(); }
             }

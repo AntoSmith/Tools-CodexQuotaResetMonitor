@@ -179,7 +179,9 @@ namespace CodexQuotaDesktop
                 Check(constructor != null, "Stopped setup launch option is missing");
                 BuildSettingsRuntime(root);
                 DashboardWindow dashboard = new DashboardWindow(); Offscreen(dashboard);
-                TrayApplication app = new TrayApplication(root, true, true, false, dashboard, delegate(SettingsWindow settings) { Offscreen(settings); });
+                int welcomeCount = 0;
+                TrayApplication app = new TrayApplication(root, true, true, false, dashboard, delegate(SettingsWindow settings) { Offscreen(settings); }, true,
+                    delegate(bool configured) { Check(!configured, "First-run guide must describe incomplete setup"); welcomeCount++; return DialogResult.OK; });
                 try
                 {
                     DashboardState state = (DashboardState)typeof(TrayApplication).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(app);
@@ -188,12 +190,26 @@ namespace CodexQuotaDesktop
                     Check(!state.Active && state.Phase == "stopped" && !monitor.Running, "First-run setup started or attempted monitoring");
                     Check(window.Visible && window.StartButton.Enabled && !window.StopButton.Enabled, "Autostart first run must show a stopped setup window");
                     VerifySetupDialog(state, monitor, delegate { Application.DoEvents(); });
+                    Check(welcomeCount == 1 && !WelcomeGuide.ShouldShow(root, true), "First-use guide choice must be remembered without starting monitoring");
                     Check(window.Controls.Find("portableSetupDescription", true).Any(control => control.Text.Contains("邮件发送") && control.Text.Contains("监控账号") && control.Text.Contains("浏览器") && !control.Text.Contains("LoginX")), "First-run setup instructions must explain GUI setup without requiring login");
                     VerifySetupDialog(state, monitor, delegate { window.StartButton.PerformClick(); });
                     Check(!state.Active && !monitor.Running, "Unsaved first-run setup must stay stopped when Start is clicked");
                     Check(!File.Exists(Path.Combine(root, "logs", "desktop-monitor.log")) && !Directory.Exists(Path.Combine(root, "data", "browser")), "First-run setup created monitoring data or logs");
                 }
                 finally { app.Quit(); }
+                File.Delete(Path.Combine(root, "data", "desktop", "welcome-seen-v1"));
+                int skippedGuides = 0, skippedSettings = 0;
+                DashboardWindow skippedDashboard = new DashboardWindow(); Offscreen(skippedDashboard);
+                TrayApplication skipped = new TrayApplication(root, true, true, false, skippedDashboard,
+                    delegate(SettingsWindow settings) { skippedSettings++; Offscreen(settings); }, true,
+                    delegate(bool configured) { skippedGuides++; return DialogResult.Cancel; });
+                try {
+                    Application.DoEvents();
+                    DashboardState skippedState = (DashboardState)typeof(TrayApplication).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(skipped);
+                    Check(skippedGuides == 1 && skippedSettings == 0 && !skippedState.Active, "Skipping guide must not open settings or start monitoring");
+                    Check(!WelcomeGuide.ShouldShow(root, true) && PortableConfiguration.IsSetupPending(root), "Skipping guide must preserve setup-required state while remembering choice");
+                    Check(File.ReadAllBytes(config).SequenceEqual(configuredBytes), "Guide choices changed private configuration");
+                } finally { skipped.Quit(); }
                 File.WriteAllText(report, "PASS bundled runtime priority, development fallback, relocation with Chinese/spaces, exclusive template-only setup, existing bytes, browser selection, missing-template error, persistent pending marker, safe marker failure, offscreen automatic GUI mail setup and unsaved first-run start guard", new UTF8Encoding(false));
                 return 0;
             }

@@ -65,6 +65,7 @@ APP_SOURCE_FILES = (
     'assets/screenshots/alert.png', 'assets/screenshots/history.png',
     'assets/screenshots/subscribers.png', 'assets/screenshots/email-demo.png',
     'assets/screenshots/mail-settings.png',
+    'assets/screenshots/welcome.png',
     'assets/email/celebrate.gif', 'assets/email/celebrate.png',
     'assets/email/neutral.gif', 'assets/email/neutral.png',
     'assets/email/uncertain.gif', 'assets/email/uncertain.png', 'assets/email/README.md',
@@ -73,7 +74,7 @@ DESKTOP_SOURCE_FILES = (
     'AlertWindow.cs', 'AppBrand.cs', 'DashboardState.cs', 'DashboardWindow.cs',
     'HistoryClient.cs', 'HistoryVerification.cs', 'HistoryWindow.cs', 'Launcher.cs',
     'PortableVerification.cs', 'RecipientSettings.cs', 'ReviewPanel.cs', 'SettingsWindow.cs', 'SetupPanels.cs', 'TrayApplication.cs',
-    'UiVerification.cs', 'ReleaseUpdates.cs', 'UpdateInstaller.cs', 'UpdateWindow.cs',
+    'UiVerification.cs', 'ReleaseUpdates.cs', 'UpdateInstaller.cs', 'UpdateWindow.cs', 'WelcomeWindow.cs',
 )
 FORBIDDEN_COMPONENTS = {
     'data', 'logs', '.git', '.codex', '.agents', '__pycache__',
@@ -502,7 +503,7 @@ def smoke_test(stage):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', default='0.2.2', help='Application release version (default: 0.2.2)')
+    parser.add_argument('--version', default='0.2.3', help='Application release version (default: 0.2.3)')
     parser.add_argument('--offline', action='store_true', help='Use already verified download-cache files only')
     parser.add_argument('--download-only', action='store_true', help='Fill and verify the official runtime download cache')
     parser.add_argument('--skip-smoke-tests', action='store_true', help='Skip bundled runtime import checks')
